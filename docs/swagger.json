@@ -12,8 +12,13 @@
     },
     "basePath": "/",
     "paths": {
-        "/api/v1/auth/login": {
+        "/api/v1/authorization/batch-check": {
             "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -21,17 +26,17 @@
                     "application/json"
                 ],
                 "tags": [
-                    "authentication"
+                    "authorization-decisions"
                 ],
-                "summary": "Issue a JWT access token",
+                "summary": "Preview up to 100 authorization decisions",
                 "parameters": [
                     {
-                        "description": "Client credentials",
+                        "description": "Authorization checks",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/httptransport.LoginRequest"
+                            "$ref": "#/definitions/httptransport.BatchCheckAuthorizationRequest"
                         }
                     }
                 ],
@@ -39,35 +44,461 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/httptransport.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "body": {
-                                            "$ref": "#/definitions/httptransport.LoginResponseBody"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/httptransport.Response"
                         }
-                    },
-                    "400": {
-                        "description": "Code 10001: invalid request",
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/bindings/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-bindings"
+                ],
+                "summary": "Bind a role to a membership, group, or service account",
+                "parameters": [
+                    {
+                        "description": "Role binding",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CreateBindingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httptransport.Response"
                         }
-                    },
-                    "401": {
-                        "description": "Code 20001: invalid credentials",
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/bindings/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-bindings"
+                ],
+                "summary": "List tenant or subject role bindings",
+                "parameters": [
+                    {
+                        "description": "Tenant, optional subject, and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListBindingsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httptransport.Response"
                         }
-                    },
-                    "429": {
-                        "description": "Code 10029: rate limited",
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/bindings/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-bindings"
+                ],
+                "summary": "Revoke a binding with optimistic locking",
+                "parameters": [
+                    {
+                        "description": "Binding and current version",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.RevokeBindingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/check": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-decisions"
+                ],
+                "summary": "Preview an authorization decision",
+                "parameters": [
+                    {
+                        "description": "Authorization check",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CheckAuthorizationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/permissions/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-permissions"
+                ],
+                "summary": "Create a tenant permission",
+                "parameters": [
+                    {
+                        "description": "Permission",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CreatePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/permissions/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-permissions"
+                ],
+                "summary": "List tenant permissions",
+                "parameters": [
+                    {
+                        "description": "Tenant and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListPermissionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/role-permissions/grant": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Grant a permission to a role",
+                "parameters": [
+                    {
+                        "description": "Role permission",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.GrantRolePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/role-permissions/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "List permissions assigned to a role",
+                "parameters": [
+                    {
+                        "description": "Role",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListRolePermissionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/role-permissions/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Revoke a role permission with optimistic locking",
+                "parameters": [
+                    {
+                        "description": "Role permission and current version",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.RevokeRolePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/roles/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Create a tenant role",
+                "parameters": [
+                    {
+                        "description": "Role",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CreateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/roles/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "List tenant roles",
+                "parameters": [
+                    {
+                        "description": "Tenant and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListRolesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/roles/update": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Update a role with optimistic locking",
+                "parameters": [
+                    {
+                        "description": "Role and current version",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.UpdateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/httptransport.Response"
                         }
@@ -110,268 +541,6 @@
                     },
                     "401": {
                         "description": "Code 20001: unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Create a user",
-                "parameters": [
-                    {
-                        "description": "User",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.CreateUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/httptransport.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "body": {
-                                            "$ref": "#/definitions/user.User"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Code 10001: invalid request",
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
-                        }
-                    },
-                    "409": {
-                        "description": "Code 30009: email already exists",
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/delete": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Delete a user using optimistic locking",
-                "parameters": [
-                    {
-                        "description": "User ID and current version",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.DeleteUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/get": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Get a user",
-                "parameters": [
-                    {
-                        "description": "User ID",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.GetUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/httptransport.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "body": {
-                                            "$ref": "#/definitions/user.User"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "404": {
-                        "description": "Code 10004: user not found",
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "List users",
-                "parameters": [
-                    {
-                        "description": "Pagination",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.ListUsersRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/httptransport.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "body": {
-                                            "$ref": "#/definitions/user.Page"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/users/update": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Update a user using optimistic locking",
-                "parameters": [
-                    {
-                        "description": "User and current version",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/httptransport.UpdateUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/httptransport.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "body": {
-                                            "$ref": "#/definitions/user.User"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "409": {
-                        "description": "Code 30009: version conflict",
                         "schema": {
                             "$ref": "#/definitions/httptransport.Response"
                         }
@@ -537,88 +706,223 @@
                 }
             }
         },
-        "httptransport.CreateUserRequest": {
+        "httptransport.BatchCheckAuthorizationRequest": {
             "type": "object",
             "required": [
-                "email",
-                "name"
+                "checks"
             ],
             "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "alice@example.com"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Alice"
+                "checks": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/httptransport.CheckAuthorizationRequest"
+                    }
                 }
             }
         },
-        "httptransport.DeleteUserRequest": {
+        "httptransport.CheckAuthorizationRequest": {
             "type": "object",
             "required": [
-                "id",
-                "version"
+                "action",
+                "resource_type",
+                "subject_id",
+                "subject_type",
+                "tenant_id"
             ],
             "properties": {
-                "id": {
-                    "type": "string",
-                    "format": "uuid"
-                },
-                "version": {
-                    "type": "integer"
-                }
-            }
-        },
-        "httptransport.GetUserRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "id": {
-                    "type": "string",
-                    "format": "uuid"
-                }
-            }
-        },
-        "httptransport.ListUsersRequest": {
-            "type": "object",
-            "properties": {
-                "page": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "page_size": {
-                    "type": "integer",
-                    "example": 20
-                }
-            }
-        },
-        "httptransport.LoginRequest": {
-            "type": "object",
-            "required": [
-                "client_id",
-                "client_secret"
-            ],
-            "properties": {
-                "client_id": {
-                    "type": "string",
-                    "example": "local-client"
-                },
-                "client_secret": {
-                    "type": "string",
-                    "example": "local-secret"
-                }
-            }
-        },
-        "httptransport.LoginResponseBody": {
-            "type": "object",
-            "properties": {
-                "access_token": {
+                "action": {
                     "type": "string"
                 },
-                "token_type": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "resource_id": {
+                    "type": "string"
+                },
+                "resource_type": {
+                    "type": "string"
+                },
+                "subject_id": {
+                    "type": "string"
+                },
+                "subject_type": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.CreateBindingRequest": {
+            "type": "object",
+            "required": [
+                "role_id",
+                "subject_id",
+                "subject_type",
+                "tenant_id"
+            ],
+            "properties": {
+                "organization_unit_id": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "subject_id": {
+                    "type": "string"
+                },
+                "subject_type": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.CreatePermissionRequest": {
+            "type": "object",
+            "required": [
+                "action",
+                "code",
+                "name",
+                "resource_type",
+                "tenant_id"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "condition_expression": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource_type": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.CreateRoleRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "data_scope",
+                "name",
+                "tenant_id"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data_scope": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.GrantRolePermissionRequest": {
+            "type": "object",
+            "required": [
+                "permission_id",
+                "role_id",
+                "tenant_id"
+            ],
+            "properties": {
+                "permission_id": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListBindingsRequest": {
+            "type": "object",
+            "required": [
+                "tenant_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "subject_id": {
+                    "type": "string"
+                },
+                "subject_type": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListPermissionsRequest": {
+            "type": "object",
+            "required": [
+                "tenant_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListRolePermissionsRequest": {
+            "type": "object",
+            "required": [
+                "role_id"
+            ],
+            "properties": {
+                "role_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListRolesRequest": {
+            "type": "object",
+            "required": [
+                "tenant_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -646,23 +950,14 @@
                 }
             }
         },
-        "httptransport.UpdateUserRequest": {
+        "httptransport.RevokeBindingRequest": {
             "type": "object",
             "required": [
-                "email",
-                "id",
-                "name",
+                "binding_id",
                 "version"
             ],
             "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string",
-                    "format": "uuid"
-                },
-                "name": {
+                "binding_id": {
                     "type": "string"
                 },
                 "version": {
@@ -670,42 +965,44 @@
                 }
             }
         },
-        "user.Page": {
+        "httptransport.RevokeRolePermissionRequest": {
             "type": "object",
+            "required": [
+                "role_permission_id",
+                "version"
+            ],
             "properties": {
-                "page": {
-                    "type": "integer"
+                "role_permission_id": {
+                    "type": "string"
                 },
-                "page_size": {
+                "version": {
                     "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "users": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/user.User"
-                    }
                 }
             }
         },
-        "user.User": {
+        "httptransport.UpdateRoleRequest": {
             "type": "object",
+            "required": [
+                "data_scope",
+                "name",
+                "role_id",
+                "status",
+                "version"
+            ],
             "properties": {
-                "created_at": {
+                "data_scope": {
                     "type": "string"
                 },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
+                "description": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
-                "updated_at": {
+                "role_id": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 },
                 "version": {

@@ -15,6 +15,7 @@ import (
 	hellov1 "github.com/lihongjie0209/authorization-service/gen/hello/v1"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	"github.com/lihongjie0209/authorization-service/internal/auth"
+	authorizationdomain "github.com/lihongjie0209/authorization-service/internal/authorization"
 	"github.com/lihongjie0209/authorization-service/internal/buildinfo"
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	"github.com/lihongjie0209/authorization-service/internal/environment"
@@ -22,7 +23,9 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/idempotency"
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
-	"github.com/lihongjie0209/authorization-service/internal/user"
+
+	"github.com/lihongjie0209/microservice-platform-go/principal"
+	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
@@ -41,7 +44,7 @@ type Server struct {
 	logger  *slog.Logger
 }
 
-func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, healthService *apphealth.Service, userService *user.Service, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
+func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, healthService *apphealth.Service, authorizationService *authorizationdomain.Service, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
 	options := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(cfg.GRPC.MaxReceiveBytes),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -57,7 +60,7 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, he
 	}
 	grpcServer := grpc.NewServer(options...)
 	hellov1.RegisterHelloServiceServer(grpcServer, &helloServer{})
-	hellov1.RegisterUserServiceServer(grpcServer, &userServer{service: userService})
+	authorizationv1.RegisterAuthorizationServiceServer(grpcServer, &authorizationServer{service: authorizationService})
 	grpc_health_v1.RegisterHealthServer(grpcServer, &healthServer{health: healthService})
 	if cfg.GRPC.ReflectionEnabled {
 		reflection.Register(grpcServer)
@@ -117,50 +120,6 @@ type healthServer struct {
 	health *apphealth.Service
 }
 
-type userServer struct {
-	hellov1.UnimplementedUserServiceServer
-	service *user.Service
-}
-
-func (s *userServer) CreateUser(ctx context.Context, req *hellov1.CreateUserRequest) (*hellov1.User, error) {
-	created, err := s.service.Create(ctx, req.GetName(), req.GetEmail())
-	return userResponse(created, err)
-}
-func (s *userServer) GetUser(ctx context.Context, req *hellov1.GetUserRequest) (*hellov1.User, error) {
-	found, err := s.service.Get(ctx, req.GetId())
-	return userResponse(found, err)
-}
-func (s *userServer) ListUsers(ctx context.Context, req *hellov1.ListUsersRequest) (*hellov1.ListUsersResponse, error) {
-	page, err := s.service.List(ctx, int(req.GetPage()), int(req.GetPageSize()))
-	if err != nil {
-		return nil, grpcError(err)
-	}
-	users := make([]*hellov1.User, 0, len(page.Users))
-	for _, item := range page.Users {
-		users = append(users, toProtoUser(item))
-	}
-	return &hellov1.ListUsersResponse{Users: users, Total: page.Total, Page: int32(page.Page), PageSize: int32(page.PageSize)}, nil
-}
-func (s *userServer) UpdateUser(ctx context.Context, req *hellov1.UpdateUserRequest) (*hellov1.User, error) {
-	updated, err := s.service.Update(ctx, req.GetId(), req.GetName(), req.GetEmail(), req.GetVersion())
-	return userResponse(updated, err)
-}
-func (s *userServer) DeleteUser(ctx context.Context, req *hellov1.DeleteUserRequest) (*hellov1.DeleteUserResponse, error) {
-	if err := s.service.Delete(ctx, req.GetId(), req.GetVersion()); err != nil {
-		return nil, grpcError(err)
-	}
-	return &hellov1.DeleteUserResponse{Deleted: true}, nil
-}
-
-func userResponse(value user.User, err error) (*hellov1.User, error) {
-	if err != nil {
-		return nil, grpcError(err)
-	}
-	return toProtoUser(value), nil
-}
-func toProtoUser(value user.User) *hellov1.User {
-	return &hellov1.User{Id: value.ID, Name: value.Name, Email: value.Email, Version: value.Version, CreatedAt: value.CreatedAt.Format(time.RFC3339Nano), UpdatedAt: value.UpdatedAt.Format(time.RFC3339Nano)}
-}
 func grpcError(err error) error {
 	var appErr *apperror.Error
 	if !errors.As(err, &appErr) {
@@ -235,7 +194,7 @@ func authenticateGRPC(ctx context.Context, method string, service *auth.Service,
 		if len(values) == 0 || !auth.VerifyPSK(values[0], cfg.PSK.Key) {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid PSK")
 		}
-		return context.WithValue(ctx, subjectKey{}, "psk"), nil
+		return principal.WithContext(context.WithValue(ctx, subjectKey{}, "psk"), principal.Principal{ID: "psk", Type: principal.TypeServiceAccount}), nil
 	}
 	if auth.MatchesAny(method, cfg.SkipGRPCMethods) {
 		return ctx, nil
@@ -247,11 +206,11 @@ func authenticateGRPC(ctx context.Context, method string, service *auth.Service,
 	if !ok || !strings.EqualFold(scheme, "Bearer") {
 		return nil, status.Error(codes.Unauthenticated, "invalid bearer token")
 	}
-	claims, err := service.Parse(raw)
+	caller, err := service.Verify(ctx, raw)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 	}
-	return context.WithValue(ctx, subjectKey{}, claims.Subject), nil
+	return principal.WithContext(context.WithValue(ctx, subjectKey{}, caller.ID), caller), nil
 }
 
 type contextServerStream struct {

@@ -10,6 +10,7 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/auth"
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -69,9 +70,15 @@ func TestAuthenticateGRPC_PSKWildcard(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs("authorization", test.header))
-			_, err := authenticateGRPC(ctx, "/hello.v1.UserService/GetUser", authService, cfg)
+			authCtx, err := authenticateGRPC(ctx, "/hello.v1.UserService/GetUser", authService, cfg)
 			if got := status.Code(err); got != test.code {
 				t.Fatalf("status code = %s, want %s", got, test.code)
+			}
+			if test.code == codes.OK {
+				actor, ok := principal.FromContext(authCtx)
+				if !ok || actor.ID != "psk" {
+					t.Fatalf("principal = %+v, found=%v", actor, ok)
+				}
 			}
 		})
 	}

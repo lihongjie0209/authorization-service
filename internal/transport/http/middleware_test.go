@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/authorization-service/internal/auth"
 	"github.com/lihongjie0209/authorization-service/internal/config"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
 func TestRequestID(t *testing.T) {
@@ -33,6 +34,44 @@ func TestRequestID(t *testing.T) {
 	}
 	if response.RequestID != "client-request-1" {
 		t.Fatalf("request_id = %q", response.RequestID)
+	}
+}
+
+func TestAuthentication_InjectsSharedPrincipal(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+	const key = "01234567890123456789012345678901"
+	service := auth.New(config.Config{JWT: config.JWT{Issuer: "test", Secret: key, TTL: time.Hour}, Auth: config.Auth{ClientID: "client", ClientSecret: "secret"}})
+	token, err := service.Issue("service-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, header, wantID string
+		cfg                  config.Auth
+	}{
+		{name: "JWT", header: "Bearer " + token, wantID: "service-1"},
+		{name: "PSK", header: "PSK " + key, wantID: "psk", cfg: config.Auth{PSK: config.PSK{Enabled: true, Key: key, HTTPPaths: []string{"/api/v1/test"}}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(Authentication(service, slog.New(slog.NewTextHandler(io.Discard, nil)), test.cfg))
+			router.POST("/api/v1/test", func(c *gin.Context) {
+				actor, ok := principal.FromContext(c.Request.Context())
+				if !ok || actor.ID != test.wantID {
+					c.Status(http.StatusInternalServerError)
+					return
+				}
+				c.Status(http.StatusOK)
+			})
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/test", nil)
+			request.Header.Set("Authorization", test.header)
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d", recorder.Code)
+			}
+		})
 	}
 }
 

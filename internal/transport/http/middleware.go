@@ -18,6 +18,7 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	appLimit "github.com/lihongjie0209/authorization-service/internal/ratelimit"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -212,12 +213,13 @@ func JWT(service *auth.Service, logger *slog.Logger) gin.HandlerFunc {
 			Fail(c, logger, apperror.Unauthorized("missing bearer token"))
 			return
 		}
-		claims, err := service.Parse(raw)
+		caller, err := service.Verify(c.Request.Context(), raw)
 		if err != nil {
 			Fail(c, logger, apperror.Unauthorized("invalid or expired token"))
 			return
 		}
-		c.Set("subject", claims.Subject)
+		c.Set("subject", caller.ID)
+		c.Request = c.Request.WithContext(principal.WithContext(c.Request.Context(), caller))
 		c.Next()
 	}
 }
@@ -231,6 +233,7 @@ func Authentication(service *auth.Service, logger *slog.Logger, cfg config.Auth)
 				return
 			}
 			c.Set("subject", "psk")
+			c.Request = c.Request.WithContext(principal.WithContext(c.Request.Context(), principal.Principal{ID: "psk", Type: principal.TypeServiceAccount}))
 			c.Next()
 			return
 		}

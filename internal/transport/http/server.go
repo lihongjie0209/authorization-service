@@ -58,14 +58,21 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 		subject, _ := value.(string)
 		return subject
 	}, logger))
-	api.POST("/auth/login", RateLimit(limiter, cfg.RateLimit.Login, "login", func(c *gin.Context) string { return c.ClientIP() }, logger), handler.Login)
 	api.POST("/version", handler.Version)
 	api.POST("/me", handler.Me)
-	api.POST("/users/create", handler.CreateUser)
-	api.POST("/users/get", handler.GetUser)
-	api.POST("/users/list", handler.ListUsers)
-	api.POST("/users/update", handler.UpdateUser)
-	api.POST("/users/delete", handler.DeleteUser)
+	api.POST("/authorization/permissions/create", handler.CreatePermission)
+	api.POST("/authorization/permissions/list", handler.ListPermissions)
+	api.POST("/authorization/roles/create", handler.CreateRole)
+	api.POST("/authorization/roles/update", handler.UpdateRole)
+	api.POST("/authorization/roles/list", handler.ListRoles)
+	api.POST("/authorization/role-permissions/grant", handler.GrantRolePermission)
+	api.POST("/authorization/role-permissions/revoke", handler.RevokeRolePermission)
+	api.POST("/authorization/role-permissions/list", handler.ListRolePermissions)
+	api.POST("/authorization/bindings/create", handler.CreateBinding)
+	api.POST("/authorization/bindings/revoke", handler.RevokeBinding)
+	api.POST("/authorization/bindings/list", handler.ListBindings)
+	api.POST("/authorization/check", handler.CheckAuthorization)
+	api.POST("/authorization/batch-check", handler.BatchCheckAuthorization)
 	server := &http.Server{Addr: cfg.HTTP.Address, Handler: router, ReadTimeout: cfg.HTTP.ReadTimeout, WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout}
 	var listener net.Listener
 	lc.Append(fx.Hook{OnStart: func(context.Context) error {
@@ -108,4 +115,4 @@ func registerPprof(group *gin.RouterGroup) {
 	}
 }
 
-var Module = fx.Module("http", fx.Provide(auth.New, health.New, ratelimit.New, NewHandler, NewServer), fx.Invoke(func(*http.Server) {}))
+var Module = fx.Module("http", fx.Provide(auth.NewRuntime, health.New, ratelimit.New, NewHandler, NewServer), fx.Invoke(func(*http.Server) {}))
