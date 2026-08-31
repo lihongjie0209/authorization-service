@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	"github.com/lihongjie0209/authorization-service/internal/database"
+	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 )
 
 type fakeRepository struct {
@@ -153,5 +154,12 @@ func TestNormalizePageRejectsOversize(t *testing.T) {
 	appErr, ok := err.(*apperror.Error)
 	if !ok || appErr.Code != apperror.CodeInvalidArgument {
 		t.Fatalf("normalizePage() error = %v", err)
+	}
+}
+
+func TestValidSubjectTypeIncludesPlatformUser(t *testing.T) {
+	t.Parallel()
+	if !validSubjectType("user") || subjectTypeProto("user") != authorizationv1.SubjectType_SUBJECT_TYPE_USER {
+		t.Fatal("platform user subject must be accepted and mapped to protobuf")
 	}
 }

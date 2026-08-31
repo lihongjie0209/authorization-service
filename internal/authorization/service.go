@@ -440,7 +440,7 @@ func validDataScope(value string) bool {
 }
 func validSubjectType(value string) bool {
 	switch value {
-	case "membership", "service_account", "group":
+	case "membership", "service_account", "group", "user":
 		return true
 	}
 	return false
@@ -474,6 +474,8 @@ func subjectTypeProto(value string) authorizationv1.SubjectType {
 		return authorizationv1.SubjectType_SUBJECT_TYPE_SERVICE_ACCOUNT
 	case "group":
 		return authorizationv1.SubjectType_SUBJECT_TYPE_GROUP
+	case "user":
+		return authorizationv1.SubjectType_SUBJECT_TYPE_USER
 	}
 	return authorizationv1.SubjectType_SUBJECT_TYPE_UNSPECIFIED
 }
