@@ -168,15 +168,28 @@ func (s *Service) GrantRolePermission(ctx context.Context, tenantID, roleID, per
 	if tenantID == "" || tenantID != role.TenantID || tenantID != permission.TenantID {
 		return RolePermission{}, apperror.Invalid("role and permission must belong to tenant", nil)
 	}
+	existing, existingErr := s.repository.GetRolePermissionByPair(ctx, roleID, permissionID)
+	if existingErr == nil && existing.Status == "active" {
+		return existing, nil
+	}
+	if existingErr != nil && !errors.Is(existingErr, ErrNotFound) {
+		return RolePermission{}, translate(existingErr)
+	}
 	fields, err := audit.New(ctx, s.now())
 	if err != nil {
 		return RolePermission{}, apperror.Unauthorized("authenticated actor is required")
 	}
 	value := RolePermission{ID: uuid.NewString(), TenantID: tenantID, RoleID: roleID, PermissionID: permissionID, Status: "active", AuditFields: auditFields(fields)}
-	if err := s.mutate(ctx, tenantID, "", "unspecified", "role_permission_granted", fields, func(tx *sqlx.Tx) error { return s.repository.CreateRolePermission(ctx, tx, value) }); err != nil {
+	operation := func(tx *sqlx.Tx) error { return s.repository.CreateRolePermission(ctx, tx, value) }
+	if existingErr == nil {
+		value = existing
+		value.Status, value.UpdatedAt, value.UpdatedBy = "active", fields.UpdatedAt, fields.UpdatedBy
+		operation = func(tx *sqlx.Tx) error { return s.repository.UpdateRolePermission(ctx, tx, value) }
+	}
+	if err := s.mutate(ctx, tenantID, "", "unspecified", "role_permission_granted", fields, operation); err != nil {
 		return RolePermission{}, err
 	}
-	return value, nil
+	return s.repository.GetRolePermissionByPair(ctx, roleID, permissionID)
 }
 
 func (s *Service) RevokeRolePermission(ctx context.Context, id string, version int64) (RolePermission, error) {

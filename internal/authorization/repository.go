@@ -26,6 +26,7 @@ type Repository interface {
 	GetPermission(context.Context, string) (Permission, error)
 	CreateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error
 	GetRolePermission(context.Context, string) (RolePermission, error)
+	GetRolePermissionByPair(context.Context, string, string) (RolePermission, error)
 	UpdateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error
 	ListRolePermissions(context.Context, string) ([]RolePermission, error)
 	CreateBinding(context.Context, sqlx.ExtContext, Binding) error
@@ -116,6 +117,11 @@ func (r *SQLRepository) GetRolePermission(ctx context.Context, id string) (RoleP
 	var value RolePermission
 	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE id = ?"), id)
 	return value, mapNotFound(err, "select role permission")
+}
+func (r *SQLRepository) GetRolePermissionByPair(ctx context.Context, roleID, permissionID string) (RolePermission, error) {
+	var value RolePermission
+	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND permission_id = ?"), roleID, permissionID)
+	return value, mapNotFound(err, "select role permission by pair")
 }
 func (r *SQLRepository) UpdateRolePermission(ctx context.Context, exec sqlx.ExtContext, value RolePermission) error {
 	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE role_permissions SET status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?"), value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)

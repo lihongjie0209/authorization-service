@@ -40,6 +40,9 @@ func (*fakeRepository) CreateRolePermission(context.Context, sqlx.ExtContext, Ro
 func (*fakeRepository) GetRolePermission(context.Context, string) (RolePermission, error) {
 	return RolePermission{}, ErrNotFound
 }
+func (*fakeRepository) GetRolePermissionByPair(context.Context, string, string) (RolePermission, error) {
+	return RolePermission{}, ErrNotFound
+}
 func (*fakeRepository) UpdateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error {
 	return nil
 }
