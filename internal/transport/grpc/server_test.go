@@ -6,11 +6,33 @@ import (
 
 	"github.com/lihongjie0209/authorization-service/internal/auth"
 	"github.com/lihongjie0209/authorization-service/internal/config"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
+
+func TestAuthorizationGRPCRequirementCoversManagementAndExcludesDecisions(t *testing.T) {
+	t.Parallel()
+	resolve := authorizationGRPCRequirement(true)
+	protected := []string{authorizationv1.AuthorizationService_CreatePermission_FullMethodName, authorizationv1.AuthorizationService_UpdatePermission_FullMethodName, authorizationv1.AuthorizationService_ListPermissions_FullMethodName, authorizationv1.AuthorizationService_CreateRole_FullMethodName, authorizationv1.AuthorizationService_UpdateRole_FullMethodName, authorizationv1.AuthorizationService_ListRoles_FullMethodName, authorizationv1.AuthorizationService_GrantRolePermission_FullMethodName, authorizationv1.AuthorizationService_RevokeRolePermission_FullMethodName, authorizationv1.AuthorizationService_ListRolePermissions_FullMethodName, authorizationv1.AuthorizationService_CreateBinding_FullMethodName, authorizationv1.AuthorizationService_RevokeBinding_FullMethodName, authorizationv1.AuthorizationService_ListBindings_FullMethodName}
+	for _, method := range protected {
+		requirement, ok := resolve(method)
+		if !ok || requirement.Resource == "" || requirement.Action == "" || requirement.Scope != platformauthz.ScopePrincipal {
+			t.Fatalf("method %q requirement = %+v, %v", method, requirement, ok)
+		}
+	}
+	for _, method := range []string{authorizationv1.AuthorizationService_Check_FullMethodName, authorizationv1.AuthorizationService_BatchCheck_FullMethodName, authorizationv1.AuthorizationService_ResolveDataScope_FullMethodName, authorizationv1.AuthorizationService_InvalidateSubject_FullMethodName} {
+		if _, ok := resolve(method); ok {
+			t.Fatalf("decision method %q must not recurse", method)
+		}
+	}
+	if _, ok := authorizationGRPCRequirement(false)(protected[0]); ok {
+		t.Fatal("disabled authorization must not enforce")
+	}
+}
 
 func TestAuthenticateGRPC_PSKWildcard(t *testing.T) {
 	t.Parallel()

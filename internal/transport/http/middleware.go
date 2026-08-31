@@ -2,6 +2,7 @@ package httptransport
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	appLimit "github.com/lihongjie0209/authorization-service/internal/ratelimit"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -35,6 +37,44 @@ func RequestID() gin.HandlerFunc {
 		c.Request = c.Request.WithContext(requestid.WithContext(c.Request.Context(), id))
 		c.Next()
 	}
+}
+
+func Authorization(enabled bool, authorizer platformauthz.Authorizer, logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requirement, protected := authorizationHTTPRequirement(c.FullPath())
+		if !enabled || !protected {
+			c.Next()
+			return
+		}
+		if err := platformauthz.Enforce(c.Request.Context(), authorizer, requirement); err != nil {
+			if errors.Is(err, platformauthz.ErrDecisionUnavailable) {
+				Fail(c, logger, apperror.Unavailable("authorization decision is unavailable", err))
+				return
+			}
+			Fail(c, logger, apperror.Forbidden("permission denied"))
+			return
+		}
+		c.Next()
+	}
+}
+
+func authorizationHTTPRequirement(route string) (platformauthz.Requirement, bool) {
+	requirements := map[string]platformauthz.Requirement{
+		"/api/v1/authorization/permissions/create":      {Resource: "authorization.permission", Action: "create", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/permissions/update":      {Resource: "authorization.permission", Action: "update", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/permissions/list":        {Resource: "authorization.permission", Action: "list", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/roles/create":            {Resource: "authorization.role", Action: "create", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/roles/update":            {Resource: "authorization.role", Action: "update", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/roles/list":              {Resource: "authorization.role", Action: "list", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/role-permissions/grant":  {Resource: "authorization.role-permission", Action: "grant", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/role-permissions/revoke": {Resource: "authorization.role-permission", Action: "revoke", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/role-permissions/list":   {Resource: "authorization.role-permission", Action: "list", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/bindings/create":         {Resource: "authorization.binding", Action: "create", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/bindings/revoke":         {Resource: "authorization.binding", Action: "revoke", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/bindings/list":           {Resource: "authorization.binding", Action: "list", Scope: platformauthz.ScopePrincipal},
+	}
+	requirement, ok := requirements[route]
+	return requirement, ok
 }
 
 func Environment(profile string) gin.HandlerFunc {

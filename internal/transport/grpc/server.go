@@ -22,6 +22,7 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
 
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -42,11 +43,11 @@ type Server struct {
 	logger  *slog.Logger
 }
 
-func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, healthService *apphealth.Service, authorizationService *authorizationdomain.Service, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
+func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, authorizer platformauthz.Authorizer, healthService *apphealth.Service, authorizationService *authorizationdomain.Service, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
 	options := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(cfg.GRPC.MaxReceiveBytes),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(environmentInterceptor(cfg.Runtime.ActiveProfile), requestIDInterceptor, idempotencyInterceptor, recoveryInterceptor(logger), authInterceptor(authService, cfg.Auth), metricsInterceptor(metrics, logger)),
+		grpc.ChainUnaryInterceptor(environmentInterceptor(cfg.Runtime.ActiveProfile), requestIDInterceptor, idempotencyInterceptor, recoveryInterceptor(logger), authInterceptor(authService, cfg.Auth), platformauthz.UnaryServerInterceptor(authorizer, authorizationGRPCRequirement(cfg.Authorization.Enabled)), metricsInterceptor(metrics, logger)),
 		grpc.ChainStreamInterceptor(environmentStreamInterceptor(cfg.Runtime.ActiveProfile), requestIDStreamInterceptor, idempotencyStreamInterceptor, recoveryStreamInterceptor(logger), authStreamInterceptor(authService, cfg.Auth), metricsStreamInterceptor(metrics, logger)),
 	}
 	if cfg.GRPC.TLS.Enabled {
@@ -65,6 +66,30 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, he
 	server := &Server{server: grpcServer, address: cfg.GRPC.Address, logger: logger}
 	lc.Append(fx.Hook{OnStart: server.start(cfg.GRPC.Enabled), OnStop: server.stop})
 	return server, nil
+}
+
+func authorizationGRPCRequirement(enabled bool) platformauthz.GRPCResolver {
+	return func(method string) (platformauthz.Requirement, bool) {
+		if !enabled {
+			return platformauthz.Requirement{}, false
+		}
+		requirements := map[string]platformauthz.Requirement{
+			authorizationv1.AuthorizationService_CreatePermission_FullMethodName:     {Resource: "authorization.permission", Action: "create", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_UpdatePermission_FullMethodName:     {Resource: "authorization.permission", Action: "update", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_ListPermissions_FullMethodName:      {Resource: "authorization.permission", Action: "list", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_CreateRole_FullMethodName:           {Resource: "authorization.role", Action: "create", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_UpdateRole_FullMethodName:           {Resource: "authorization.role", Action: "update", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_ListRoles_FullMethodName:            {Resource: "authorization.role", Action: "list", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_GrantRolePermission_FullMethodName:  {Resource: "authorization.role-permission", Action: "grant", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_RevokeRolePermission_FullMethodName: {Resource: "authorization.role-permission", Action: "revoke", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_ListRolePermissions_FullMethodName:  {Resource: "authorization.role-permission", Action: "list", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_CreateBinding_FullMethodName:        {Resource: "authorization.binding", Action: "create", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_RevokeBinding_FullMethodName:        {Resource: "authorization.binding", Action: "revoke", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_ListBindings_FullMethodName:         {Resource: "authorization.binding", Action: "list", Scope: platformauthz.ScopePrincipal},
+		}
+		requirement, ok := requirements[method]
+		return requirement, ok
+	}
 }
 
 func (s *Server) start(enabled bool) func(context.Context) error {

@@ -12,9 +12,12 @@ import (
 )
 
 type fakeRepository struct {
-	grants        []resolvedGrant
-	policyVersion uint64
-	resolveCalls  int
+	grants              []resolvedGrant
+	policyVersion       uint64
+	resolveCalls        int
+	resolvedTenant      string
+	resolvedSubject     string
+	resolvedSubjectType string
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
@@ -59,8 +62,9 @@ func (*fakeRepository) ListBindings(context.Context, string, string, string, int
 	return nil, 0, nil
 }
 
-func (f *fakeRepository) Resolve(context.Context, string, string, string, string, string) ([]resolvedGrant, uint64, error) {
+func (f *fakeRepository) Resolve(_ context.Context, tenantID, subjectID, subjectType, _, _ string) ([]resolvedGrant, uint64, error) {
 	f.resolveCalls++
+	f.resolvedTenant, f.resolvedSubject, f.resolvedSubjectType = tenantID, subjectID, subjectType
 	return f.grants, f.policyVersion, nil
 }
 func (*fakeRepository) BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error) {

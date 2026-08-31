@@ -510,4 +510,4 @@ func authorizationUniqueViolation(err error) bool {
 	return false
 }
 
-var Module = fx.Module("authorization", fx.Provide(NewRepository, NewService, NewRuntimeGroupProjection))
+var Module = fx.Module("authorization", fx.Provide(NewRepository, NewService, NewLocalAuthorizer, NewRuntimeGroupProjection))

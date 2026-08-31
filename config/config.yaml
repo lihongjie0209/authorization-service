@@ -94,6 +94,8 @@ auth:
     key: ""
     http_paths: []
     grpc_methods: []
+authorization:
+  enabled: false
 cron:
   enabled: true
   timezone: Asia/Shanghai
