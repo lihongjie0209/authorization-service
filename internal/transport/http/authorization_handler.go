@@ -3,6 +3,7 @@ package httptransport
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
+	authorization "github.com/lihongjie0209/authorization-service/internal/authorization"
 )
 
 type CreatePermissionRequest struct {
@@ -74,6 +75,12 @@ type ListBindingsRequest struct {
 	SubjectType string `json:"subject_type"`
 	Page        int    `json:"page"`
 	PageSize    int    `json:"page_size"`
+}
+type BindingPageResponseBody struct {
+	Items    []authorization.Binding `json:"items"`
+	Total    int64                   `json:"total"`
+	Page     int                     `json:"page"`
+	PageSize int                     `json:"page_size"`
 }
 type CheckAuthorizationRequest struct {
 	TenantID     string            `json:"tenant_id" binding:"required"`
@@ -302,7 +309,7 @@ func (h *Handler) ListRolePermissions(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body CreateBindingRequest true "Role binding"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=authorization.Binding}
 // @Router /api/v1/authorization/bindings/create [post]
 func (h *Handler) CreateBinding(c *gin.Context) {
 	var request CreateBindingRequest
@@ -325,7 +332,7 @@ func (h *Handler) CreateBinding(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body RevokeBindingRequest true "Binding and current version"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=authorization.Binding}
 // @Router /api/v1/authorization/bindings/revoke [post]
 func (h *Handler) RevokeBinding(c *gin.Context) {
 	var request RevokeBindingRequest
@@ -348,7 +355,7 @@ func (h *Handler) RevokeBinding(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListBindingsRequest true "Tenant, optional subject, and pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=BindingPageResponseBody}
 // @Router /api/v1/authorization/bindings/list [post]
 func (h *Handler) ListBindings(c *gin.Context) {
 	var request ListBindingsRequest
@@ -361,7 +368,7 @@ func (h *Handler) ListBindings(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, BindingPageResponseBody{Items: value.Items, Total: value.Total, Page: value.Page, PageSize: value.PageSize})
 }
 
 // CheckAuthorization godoc
