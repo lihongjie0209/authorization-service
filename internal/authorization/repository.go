@@ -17,6 +17,7 @@ var (
 
 type Repository interface {
 	CreatePermission(context.Context, sqlx.ExtContext, Permission) error
+	UpdatePermission(context.Context, sqlx.ExtContext, Permission) error
 	ListPermissions(context.Context, string, int, int) ([]Permission, int64, error)
 	CreateRole(context.Context, sqlx.ExtContext, Role) error
 	GetRole(context.Context, string) (Role, error)
@@ -73,6 +74,11 @@ func (r *SQLRepository) GetPermission(ctx context.Context, id string) (Permissio
 	var value Permission
 	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE id = ?"), id)
 	return value, mapNotFound(err, "select permission")
+}
+
+func (r *SQLRepository) UpdatePermission(ctx context.Context, exec sqlx.ExtContext, value Permission) error {
+	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE permissions SET name = ?, condition_expression = ?, status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?"), value.Name, value.ConditionExpression, value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
+	return affected(result, err, "update permission")
 }
 
 func (r *SQLRepository) CreateRole(ctx context.Context, exec sqlx.ExtContext, value Role) error {

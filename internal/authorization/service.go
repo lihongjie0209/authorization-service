@@ -78,6 +78,37 @@ func (s *Service) ListPermissions(ctx context.Context, tenantID string, page, pa
 	return Page[Permission]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
+func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpression, status string, version int64) (Permission, error) {
+	id, name = strings.TrimSpace(id), strings.TrimSpace(name)
+	conditionExpression, status = strings.TrimSpace(conditionExpression), strings.ToLower(strings.TrimSpace(status))
+	if id == "" || name == "" || version < 1 || (status != "active" && status != "disabled") {
+		return Permission{}, apperror.Invalid("invalid permission update", nil)
+	}
+	if conditionExpression != "" {
+		if _, issues := s.cel.Compile(conditionExpression); issues != nil && issues.Err() != nil {
+			return Permission{}, apperror.Invalid("invalid ABAC condition expression", issues.Err())
+		}
+	}
+	current, err := s.repository.GetPermission(ctx, id)
+	if err != nil {
+		return Permission{}, translate(err)
+	}
+	actor, now, err := audit.UpdatedBy(ctx, s.now())
+	if err != nil {
+		return Permission{}, apperror.Unauthorized("authenticated actor is required")
+	}
+	value := current
+	value.Name, value.ConditionExpression, value.Status = name, conditionExpression, status
+	value.Version, value.UpdatedAt, value.UpdatedBy = version, now, actor
+	fields := audit.Fields{Version: version, CreatedAt: current.CreatedAt, UpdatedAt: now, CreatedBy: current.CreatedBy, UpdatedBy: actor}
+	if err := s.mutate(ctx, current.TenantID, "", "unspecified", "permission_updated", fields, func(tx *sqlx.Tx) error {
+		return s.repository.UpdatePermission(ctx, tx, value)
+	}); err != nil {
+		return Permission{}, err
+	}
+	return s.repository.GetPermission(ctx, id)
+}
+
 func (s *Service) CreateRole(ctx context.Context, tenantID, code, name, description, dataScope string) (Role, error) {
 	tenantID, code, name = strings.TrimSpace(tenantID), strings.ToLower(strings.TrimSpace(code)), strings.TrimSpace(name)
 	dataScope = strings.ToLower(strings.TrimSpace(dataScope))

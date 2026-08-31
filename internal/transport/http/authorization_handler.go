@@ -18,6 +18,13 @@ type ListPermissionsRequest struct {
 	Page     int    `json:"page"`
 	PageSize int    `json:"page_size"`
 }
+type UpdatePermissionRequest struct {
+	PermissionID        string `json:"permission_id" binding:"required"`
+	Name                string `json:"name" binding:"required"`
+	ConditionExpression string `json:"condition_expression"`
+	Status              string `json:"status" binding:"required"`
+	Version             int64  `json:"version" binding:"required,gt=0"`
+}
 type CreateRoleRequest struct {
 	TenantID    string `json:"tenant_id" binding:"required"`
 	Code        string `json:"code" binding:"required"`
@@ -97,6 +104,29 @@ func (h *Handler) CreatePermission(c *gin.Context) {
 		return
 	}
 	value, err := h.authorization.CreatePermission(c.Request.Context(), request.TenantID, request.Code, request.Name, request.ResourceType, request.Action, request.ConditionExpression)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// UpdatePermission godoc
+// @Summary Update a tenant permission
+// @Tags authorization-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body UpdatePermissionRequest true "Permission update"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/permissions/update [post]
+func (h *Handler) UpdatePermission(c *gin.Context) {
+	var request UpdatePermissionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	value, err := h.authorization.UpdatePermission(c.Request.Context(), request.PermissionID, request.Name, request.ConditionExpression, request.Status, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return

@@ -19,6 +19,9 @@ type fakeRepository struct {
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
 	return nil
 }
+func (*fakeRepository) UpdatePermission(context.Context, sqlx.ExtContext, Permission) error {
+	return nil
+}
 func (*fakeRepository) ListPermissions(context.Context, string, int, int) ([]Permission, int64, error) {
 	return nil, 0, nil
 }
@@ -128,6 +131,16 @@ func TestService_CreatePermissionRequiresActor(t *testing.T) {
 	appErr, ok := err.(*apperror.Error)
 	if !ok || appErr.Code != apperror.CodeUnauthorized {
 		t.Fatalf("CreatePermission() error = %v, want unauthorized", err)
+	}
+}
+
+func TestService_UpdatePermissionRejectsInvalidCondition(t *testing.T) {
+	t.Parallel()
+	service := NewService(&fakeRepository{}, &database.Transactor{})
+	_, err := service.UpdatePermission(t.Context(), "permission-1", "Read invoices", "attributes[", "active", 1)
+	appErr, ok := err.(*apperror.Error)
+	if !ok || appErr.Code != apperror.CodeInvalidArgument {
+		t.Fatalf("UpdatePermission() error = %v, want invalid argument", err)
 	}
 }
 

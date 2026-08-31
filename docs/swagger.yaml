@@ -214,6 +214,24 @@ definitions:
     - role_permission_id
     - version
     type: object
+  httptransport.UpdatePermissionRequest:
+    properties:
+      condition_expression:
+        type: string
+      name:
+        type: string
+      permission_id:
+        type: string
+      status:
+        type: string
+      version:
+        type: integer
+    required:
+    - name
+    - permission_id
+    - status
+    - version
+    type: object
   httptransport.UpdateRoleRequest:
     properties:
       data_scope:
@@ -402,6 +420,29 @@ paths:
       security:
       - Bearer: []
       summary: List tenant permissions
+      tags:
+      - authorization-permissions
+  /api/v1/authorization/permissions/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Permission update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.UpdatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Update a tenant permission
       tags:
       - authorization-permissions
   /api/v1/authorization/role-permissions/grant:

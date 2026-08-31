@@ -57,6 +57,13 @@ func (s *authorizationServer) CreatePermission(ctx context.Context, request *aut
 	}
 	return &authorizationv1.CreatePermissionResponse{Permission: toProtoPermission(value)}, nil
 }
+func (s *authorizationServer) UpdatePermission(ctx context.Context, request *authorizationv1.UpdatePermissionRequest) (*authorizationv1.UpdatePermissionResponse, error) {
+	value, err := s.service.UpdatePermission(ctx, request.GetPermissionId(), request.GetName(), request.GetConditionExpression(), request.GetStatus(), request.GetExpectedVersion())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &authorizationv1.UpdatePermissionResponse{Permission: toProtoPermission(value)}, nil
+}
 func (s *authorizationServer) ListPermissions(ctx context.Context, request *authorizationv1.ListPermissionsRequest) (*authorizationv1.ListPermissionsResponse, error) {
 	page, size := protoPage(request.GetPage())
 	values, err := s.service.ListPermissions(ctx, request.GetTenantId(), page, size)
