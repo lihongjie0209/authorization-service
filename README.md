@@ -200,6 +200,18 @@ PostgreSQL and Kingbase services may also share one database while using indepen
 
 The Compose and Kubernetes examples enable startup migration for the primary PostgreSQL database. The standalone migration command and Kubernetes migration Job remain available for controlled release pipelines or maintenance operations.
 
+### Platform administrator bootstrap
+
+Migration `000006` creates the reserved `__platform__` super-admin role and its wildcard permission, but deliberately grants it to nobody. After creating the first Identity user, run the explicit, idempotent bootstrap command once:
+
+```bash
+make bootstrap-admin BOOTSTRAP_ARGS="--env production --user-id <identity-user-id>"
+# Or grant a break-glass service account:
+./bootstrap-admin --config /app/config/config.yaml --env production --service-account-id <service-account-id>
+```
+
+The command writes an audited role binding, increments the platform policy version, emits a JSON result, and requires exactly one subject flag. It is packaged in the service image for an explicitly invoked Kubernetes Job; the API process never grants or restores administrators automatically.
+
 Use a `mysql://` URL for MySQL and `postgres://` for PostgreSQL/Kingbase. The sample schema and indexes still require review against real data volume and access patterns.
 
 ## User module example

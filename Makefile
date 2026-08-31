@@ -1,4 +1,4 @@
-.PHONY: run build clean docker-build test test-race test-integration ci-test-integration lint fmt swagger swagger-check migrate-up migrate-down dev-up dev-down dev-logs
+.PHONY: run build clean docker-build test test-race test-integration ci-test-integration lint fmt swagger swagger-check migrate-up migrate-down bootstrap-admin dev-up dev-down dev-logs
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
@@ -12,6 +12,7 @@ run:
 build:
 	go build -ldflags="$(LDFLAGS)" -o bin/api ./cmd/api
 	go build -trimpath -o bin/migrate ./cmd/migrate
+	go build -trimpath -o bin/bootstrap-admin ./cmd/bootstrap-admin
 
 clean:
 	rm -rf bin
@@ -63,3 +64,6 @@ migrate-up:
 
 migrate-down:
 	go run ./cmd/migrate -direction down
+
+bootstrap-admin:
+	go run ./cmd/bootstrap-admin $(BOOTSTRAP_ARGS)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	authorizationdomain "github.com/lihongjie0209/authorization-service/internal/authorization"
+	"github.com/lihongjie0209/authorization-service/internal/bootstrap"
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	appdb "github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/authorization-service/internal/migration"
@@ -53,6 +54,16 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			t.Cleanup(func() { _ = db.Close() })
 			repository := authorizationdomain.NewRepository(db)
 			service := authorizationdomain.NewService(repository, appdb.NewTransactor(db))
+			if _, err := bootstrap.GrantPlatformSuperAdmin(ctx, db, "platform-user-1", "user"); err != nil {
+				t.Fatalf("GrantPlatformSuperAdmin() error = %v", err)
+			}
+			if _, err := bootstrap.GrantPlatformSuperAdmin(ctx, db, "platform-user-1", "user"); err != nil {
+				t.Fatalf("idempotent GrantPlatformSuperAdmin() error = %v", err)
+			}
+			platformDecision, err := service.Check(ctx, bootstrap.PlatformTenantID, "platform-user-1", "user", "identity.user", "list")
+			if err != nil || !platformDecision.Allowed || platformDecision.DataScope != "all" {
+				t.Fatalf("platform Check() = (%+v, %v)", platformDecision, err)
+			}
 			actorCtx := principal.WithContext(ctx, principal.Principal{ID: "admin-1", Type: principal.TypeServiceAccount})
 
 			permission, err := service.CreatePermission(actorCtx, "tenant-1", "invoice.read", "Read invoices", "invoice", "read")

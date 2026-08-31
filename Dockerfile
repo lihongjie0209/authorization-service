@@ -10,6 +10,7 @@ ARG COMMIT=unknown
 ARG BUILD_TIME=unknown
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/lihongjie0209/authorization-service/internal/buildinfo.Version=${VERSION} -X github.com/lihongjie0209/authorization-service/internal/buildinfo.Commit=${COMMIT} -X github.com/lihongjie0209/authorization-service/internal/buildinfo.BuildTime=${BUILD_TIME}" -o /out/api ./cmd/api
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/bootstrap-admin ./cmd/bootstrap-admin
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates tzdata \
@@ -27,6 +28,7 @@ WORKDIR /app
 RUN mkdir -p /app/logs && chown -R app:app /app
 COPY --from=build /out/api /app/api
 COPY --from=build /out/migrate /app/migrate
+COPY --from=build /out/bootstrap-admin /app/bootstrap-admin
 COPY config /app/config
 COPY migrations /app/migrations
 USER app
