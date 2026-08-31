@@ -43,7 +43,7 @@ func execute(ctx context.Context, args []string, stdout, stderr io.Writer, grant
 	command.SetOut(stdout)
 	command.SetErr(stderr)
 	if err := command.ExecuteContext(ctx); err != nil {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		var invalidUsage usageError
 		if errors.As(err, &invalidUsage) {
 			return 2
