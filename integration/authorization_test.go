@@ -115,7 +115,11 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 				t.Fatalf("outbox count = %d, err=%v", outboxCount, err)
 			}
 			publisher := &authorizationRecordingPublisher{}
-			dispatcher, err := platformoutbox.New(authorizationdomain.NewOutboxStore(db), publisher, platformoutbox.Config{BatchSize: 100, Lease: time.Minute})
+			outboxStore, err := platformoutbox.NewSQLStore(db, "authorization_outbox_events")
+			if err != nil {
+				t.Fatal(err)
+			}
+			dispatcher, err := platformoutbox.New(outboxStore, publisher, platformoutbox.Config{BatchSize: 100, Lease: time.Minute})
 			if err != nil {
 				t.Fatal(err)
 			}

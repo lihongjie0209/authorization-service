@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	authorizationdomain "github.com/lihongjie0209/authorization-service/internal/authorization"
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
@@ -16,7 +17,7 @@ import (
 
 type eventRuntime struct {
 	config config.Config
-	store  *authorizationdomain.OutboxStore
+	store  *platformoutbox.SQLStore
 	groups *authorizationdomain.GroupProjection
 	logger *slog.Logger
 	cancel context.CancelFunc
@@ -24,7 +25,7 @@ type eventRuntime struct {
 	bus    *eventbus.Bus
 }
 
-func newEventRuntime(lifecycle fx.Lifecycle, cfg config.Config, store *authorizationdomain.OutboxStore, groups *authorizationdomain.GroupProjection, logger *slog.Logger) *eventRuntime {
+func newEventRuntime(lifecycle fx.Lifecycle, cfg config.Config, store *platformoutbox.SQLStore, groups *authorizationdomain.GroupProjection, logger *slog.Logger) *eventRuntime {
 	runtime := &eventRuntime{config: cfg, store: store, groups: groups, logger: logger}
 	lifecycle.Append(fx.Hook{OnStart: runtime.start, OnStop: runtime.stop})
 	return runtime
@@ -33,6 +34,9 @@ func (r *eventRuntime) start(ctx context.Context) error {
 	if !r.config.EventBus.Enabled {
 		r.logger.Info("event bus is disabled")
 		return nil
+	}
+	if r.store == nil {
+		return errors.New("enabled event bus requires database outbox")
 	}
 	bus, err := eventbus.New(ctx, eventbus.Config{URLs: r.config.EventBus.URLs, ClientName: r.config.App.Name, StreamName: r.config.EventBus.StreamName, Subjects: []string{"platform.>"}, Storage: r.config.EventBus.Storage, MaxAge: r.config.EventBus.MaxAge, DuplicateWindow: r.config.EventBus.DuplicateWindow, ConnectTimeout: r.config.EventBus.ConnectTimeout, PublishTimeout: r.config.EventBus.PublishTimeout})
 	if err != nil {
@@ -46,7 +50,14 @@ func (r *eventRuntime) start(ctx context.Context) error {
 	r.bus = bus
 	runCtx, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
+	cleaner, err := platformoutbox.NewRetentionCleaner(r.store, platformoutbox.RetentionConfig{Retention: r.config.EventBus.PublishedRetention, BatchSize: r.config.EventBus.CleanupBatchSize})
+	if err != nil {
+		cancel()
+		_ = bus.Close()
+		return err
+	}
 	r.wg.Go(func() { r.dispatch(runCtx, dispatcher) })
+	r.wg.Go(func() { r.clean(runCtx, cleaner) })
 	r.wg.Go(func() {
 		if err := bus.Consume(runCtx, "authorization-tenant-groups-v1", "platform.tenant.group.changed.v1", r.groups.Apply); err != nil && !errors.Is(err, context.Canceled) {
 			r.logger.ErrorContext(runCtx, "consume tenant group events failed", "error", err)
@@ -54,6 +65,22 @@ func (r *eventRuntime) start(ctx context.Context) error {
 	})
 	r.logger.Info("event bus started", "stream", r.config.EventBus.StreamName)
 	return nil
+}
+func (r *eventRuntime) clean(ctx context.Context, cleaner *platformoutbox.RetentionCleaner) {
+	ticker := time.NewTicker(r.config.EventBus.CleanupInterval)
+	defer ticker.Stop()
+	for {
+		if deleted, err := cleaner.RunOnce(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			r.logger.ErrorContext(ctx, "clean published authorization outbox events", "error", err)
+		} else if deleted > 0 {
+			r.logger.InfoContext(ctx, "published authorization outbox events cleaned", "deleted", deleted)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 func (r *eventRuntime) dispatch(ctx context.Context, dispatcher *platformoutbox.Dispatcher) {
 	ticker := time.NewTicker(r.config.EventBus.DispatchInterval)
@@ -80,4 +107,11 @@ func (r *eventRuntime) stop(context.Context) error {
 	return nil
 }
 
-var EventBusModule = fx.Module("event-bus", fx.Provide(authorizationdomain.NewOutboxStore, newEventRuntime), fx.Invoke(func(*eventRuntime) {}))
+func newAuthorizationOutboxStore(db *sqlx.DB) (*platformoutbox.SQLStore, error) {
+	if db == nil {
+		return nil, nil
+	}
+	return platformoutbox.NewSQLStore(db, "authorization_outbox_events")
+}
+
+var EventBusModule = fx.Module("event-bus", fx.Provide(newAuthorizationOutboxStore, newEventRuntime), fx.Invoke(func(*eventRuntime) {}))
