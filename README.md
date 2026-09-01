@@ -212,6 +212,8 @@ make bootstrap-admin BOOTSTRAP_ARGS="--env production --user-id <identity-user-i
 
 The command writes an audited role binding, increments the platform policy version, emits a JSON result, and requires exactly one subject flag. It is packaged in the service image for an explicitly invoked Kubernetes Job; the API process never grants or restores administrators automatically.
 
+Tenant administration bootstraps differently: authorization-service durably consumes `platform.tenant.tenant.created.v1` and idempotently creates the reserved `tenant-owner-admin` role, its `*/*` permission, and a binding for the authoritative owner membership carried by tenant-service. The event ID is recorded in the same database transaction, so redelivery cannot duplicate or partially apply the grant. Other memberships receive no implicit role.
+
 Use a `mysql://` URL for MySQL and `postgres://` for PostgreSQL/Kingbase. The sample schema and indexes still require review against real data volume and access patterns.
 
 ## User module example
