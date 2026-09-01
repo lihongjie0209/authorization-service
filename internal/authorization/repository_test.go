@@ -36,3 +36,28 @@ func TestSQLRepositoryResolveIncludesWildcardPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSQLRepositoryResolvePermissionCodesUsesSingleGrantQuery(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+
+	mock.ExpectQuery("SELECT DISTINCT p\\.code").
+		WithArgs("tenant-1", "membership-1", "membership", "membership", "membership-1", "application.read", "application.update").
+		WillReturnRows(sqlmock.NewRows([]string{"code", "resource_type", "action", "condition_expression"}).AddRow("application.read", "application", "read", ""))
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"))).
+		WithArgs("tenant-1").WillReturnRows(sqlmock.NewRows([]string{"policy_version"}).AddRow(3))
+
+	grants, version, err := repository.ResolvePermissionCodes(t.Context(), "tenant-1", "membership-1", "membership", []string{"application.read", "application.update"})
+	if err != nil || len(grants) != 1 || grants[0].Code != "application.read" || version != 3 {
+		t.Fatalf("grants=%+v version=%d err=%v", grants, version, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

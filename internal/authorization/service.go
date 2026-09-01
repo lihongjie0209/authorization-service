@@ -38,6 +38,11 @@ type decisionCacheEntry struct {
 	expiresAt time.Time
 }
 
+type PermissionCodeDecision struct {
+	AllowedCodes  []string `json:"allowed_codes"`
+	PolicyVersion uint64   `json:"policy_version"`
+}
+
 func NewService(repository Repository, transactor *database.Transactor) *Service {
 	environment, _ := cel.NewEnv(cel.Variable("tenant_id", cel.StringType), cel.Variable("subject_id", cel.StringType), cel.Variable("resource_id", cel.StringType), cel.Variable("attributes", cel.MapType(cel.StringType, cel.StringType)))
 	return &Service{repository: repository, transactor: transactor, now: time.Now, cel: environment, cacheTTL: 30 * time.Second, cache: make(map[string]decisionCacheEntry)}
@@ -261,6 +266,54 @@ func (s *Service) ListBindings(ctx context.Context, tenantID, subjectID, subject
 
 func (s *Service) Check(ctx context.Context, tenantID, subjectID, subjectType, resourceType, action string) (Decision, error) {
 	return s.CheckWithAttributes(ctx, tenantID, subjectID, subjectType, resourceType, "", action, nil)
+}
+
+func (s *Service) CheckPermissionCodes(ctx context.Context, tenantID, subjectID, subjectType string, requested []string) (PermissionCodeDecision, error) {
+	tenantID, subjectID, subjectType = strings.TrimSpace(tenantID), strings.TrimSpace(subjectID), strings.ToLower(strings.TrimSpace(subjectType))
+	if len(requested) == 0 || len(requested) > 100 {
+		return PermissionCodeDecision{}, apperror.Invalid("tenant_id, a valid subject, and 1 to 100 permission_codes are required", nil)
+	}
+	seen := make(map[string]struct{}, len(requested))
+	codes := make([]string, 0, len(requested))
+	for _, requestedCode := range requested {
+		code := strings.ToLower(strings.TrimSpace(requestedCode))
+		if code == "" {
+			continue
+		}
+		if _, exists := seen[code]; !exists {
+			seen[code] = struct{}{}
+			codes = append(codes, code)
+		}
+	}
+	if tenantID == "" || subjectID == "" || !validSubjectType(subjectType) || len(codes) == 0 {
+		return PermissionCodeDecision{}, apperror.Invalid("tenant_id, a valid subject, and 1 to 100 permission_codes are required", nil)
+	}
+	grants, policyVersion, err := s.repository.ResolvePermissionCodes(ctx, tenantID, subjectID, subjectType, codes)
+	if err != nil {
+		return PermissionCodeDecision{}, translate(err)
+	}
+	allowed := make(map[string]struct{}, len(grants))
+	allowAll := false
+	for _, grant := range grants {
+		matched, matchErr := s.matchesCondition(grant.ConditionExpression, tenantID, subjectID, "", nil)
+		if matchErr != nil {
+			return PermissionCodeDecision{}, apperror.Internal(matchErr)
+		}
+		if !matched {
+			continue
+		}
+		if grant.ResourceType == "*" && grant.Action == "*" {
+			allowAll = true
+		}
+		allowed[grant.Code] = struct{}{}
+	}
+	result := PermissionCodeDecision{AllowedCodes: make([]string, 0, len(codes)), PolicyVersion: policyVersion}
+	for _, code := range codes {
+		if _, ok := allowed[code]; ok || allowAll {
+			result.AllowedCodes = append(result.AllowedCodes, code)
+		}
+	}
+	return result, nil
 }
 func (s *Service) CheckWithAttributes(ctx context.Context, tenantID, subjectID, subjectType, resourceType, resourceID, action string, attributes map[string]string) (Decision, error) {
 	if tenantID == "" || subjectID == "" || !validSubjectType(subjectType) || resourceType == "" || action == "" {

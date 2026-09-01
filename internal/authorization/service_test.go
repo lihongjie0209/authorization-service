@@ -18,6 +18,7 @@ type fakeRepository struct {
 	resolvedTenant      string
 	resolvedSubject     string
 	resolvedSubjectType string
+	codeGrants          []resolvedPermissionCodeGrant
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
@@ -67,6 +68,10 @@ func (f *fakeRepository) Resolve(_ context.Context, tenantID, subjectID, subject
 	f.resolvedTenant, f.resolvedSubject, f.resolvedSubjectType = tenantID, subjectID, subjectType
 	return f.grants, f.policyVersion, nil
 }
+func (f *fakeRepository) ResolvePermissionCodes(_ context.Context, tenantID, subjectID, subjectType string, _ []string) ([]resolvedPermissionCodeGrant, uint64, error) {
+	f.resolvedTenant, f.resolvedSubject, f.resolvedSubjectType = tenantID, subjectID, subjectType
+	return f.codeGrants, f.policyVersion, nil
+}
 func (*fakeRepository) BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error) {
 	return 1, nil
 }
@@ -81,6 +86,29 @@ func TestService_CheckDeniesWithoutGrant(t *testing.T) {
 	}
 	if decision.Allowed || decision.DataScope != "none" || decision.PolicyVersion != 7 || decision.DecisionID == "" {
 		t.Fatalf("decision = %+v", decision)
+	}
+}
+
+func TestService_CheckPermissionCodesNormalizesAndPreservesRequestOrder(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{policyVersion: 12, codeGrants: []resolvedPermissionCodeGrant{{Code: "application.read"}, {Code: "ignored", ConditionExpression: "false"}}}
+	service := NewService(repository, &database.Transactor{})
+	decision, err := service.CheckPermissionCodes(t.Context(), "tenant-1", "membership-1", "membership", []string{" APPLICATION.READ ", "denied", "application.read"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decision.AllowedCodes) != 1 || decision.AllowedCodes[0] != "application.read" || decision.PolicyVersion != 12 {
+		t.Fatalf("decision = %+v", decision)
+	}
+}
+
+func TestService_CheckPermissionCodesHonorsWildcardRole(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{codeGrants: []resolvedPermissionCodeGrant{{Code: "platform.super-admin", ResourceType: "*", Action: "*"}}}
+	service := NewService(repository, &database.Transactor{})
+	decision, err := service.CheckPermissionCodes(t.Context(), "tenant-1", "membership-1", "membership", []string{"a", "b"})
+	if err != nil || len(decision.AllowedCodes) != 2 {
+		t.Fatalf("decision=%+v err=%v", decision, err)
 	}
 }
 

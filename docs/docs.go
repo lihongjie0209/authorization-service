@@ -241,6 +241,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/authorization/my-permissions/check": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-decisions"
+                ],
+                "summary": "Check up to 100 permission codes for the authenticated tenant membership",
+                "parameters": [
+                    {
+                        "description": "Tenant and permission codes",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CheckMyPermissionCodesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/authorization.PermissionCodeDecision"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/permissions/create": {
             "post": {
                 "security": [
@@ -779,6 +829,20 @@ const docTemplate = `{
                 }
             }
         },
+        "authorization.PermissionCodeDecision": {
+            "type": "object",
+            "properties": {
+                "allowed_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "policy_version": {
+                    "type": "integer"
+                }
+            }
+        },
         "buildinfo.Info": {
             "type": "object",
             "properties": {
@@ -890,6 +954,26 @@ const docTemplate = `{
                 },
                 "subject_type": {
                     "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.CheckMyPermissionCodesRequest": {
+            "type": "object",
+            "required": [
+                "permission_codes",
+                "tenant_id"
+            ],
+            "properties": {
+                "permission_codes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "tenant_id": {
                     "type": "string"

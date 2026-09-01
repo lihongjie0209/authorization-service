@@ -75,6 +75,7 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 	api.POST("/authorization/bindings/list", handler.ListBindings)
 	api.POST("/authorization/check", handler.CheckAuthorization)
 	api.POST("/authorization/batch-check", handler.BatchCheckAuthorization)
+	api.POST("/authorization/my-permissions/check", handler.CheckMyPermissionCodes)
 	server := &http.Server{Addr: cfg.HTTP.Address, Handler: router, ReadTimeout: cfg.HTTP.ReadTimeout, WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout}
 	var listener net.Listener
 	lc.Append(fx.Hook{OnStart: func(context.Context) error {

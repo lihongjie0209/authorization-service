@@ -32,10 +32,29 @@ func TestAuthorizationHTTPRequirementCoversManagementAndExcludesDecisions(t *tes
 			t.Fatalf("route %q requirement = %+v, %v", route, requirement, ok)
 		}
 	}
-	for _, route := range []string{"/api/v1/authorization/check", "/api/v1/authorization/batch-check", "/api/v1/version", "/api/v1/me"} {
+	for _, route := range []string{"/api/v1/authorization/check", "/api/v1/authorization/batch-check", "/api/v1/authorization/my-permissions/check", "/api/v1/version", "/api/v1/me"} {
 		if _, ok := authorizationHTTPRequirement(route); ok {
 			t.Fatalf("decision/operational route %q must not recurse", route)
 		}
+	}
+}
+
+func TestBindDecisionToCallerUsesTrustedTenantMembership(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	context.Request = context.Request.WithContext(principal.WithContext(context.Request.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"}))
+	request := CheckAuthorizationRequest{TenantID: "tenant-1", SubjectID: "other", SubjectType: "user"}
+	if err := bindDecisionToCaller(context, &request); err != nil {
+		t.Fatal(err)
+	}
+	if request.SubjectID != "membership-1" || request.SubjectType != "membership" {
+		t.Fatalf("request = %+v", request)
+	}
+	request.TenantID = "tenant-2"
+	if err := bindDecisionToCaller(context, &request); err == nil {
+		t.Fatal("tenant mismatch must be rejected")
 	}
 }
 

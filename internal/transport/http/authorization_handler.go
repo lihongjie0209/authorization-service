@@ -1,9 +1,12 @@
 package httptransport
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	authorization "github.com/lihongjie0209/authorization-service/internal/authorization"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
 type CreatePermissionRequest struct {
@@ -93,6 +96,10 @@ type CheckAuthorizationRequest struct {
 }
 type BatchCheckAuthorizationRequest struct {
 	Checks []CheckAuthorizationRequest `json:"checks" binding:"required,min=1,max=100"`
+}
+type CheckMyPermissionCodesRequest struct {
+	TenantID        string   `json:"tenant_id" binding:"required"`
+	PermissionCodes []string `json:"permission_codes" binding:"required,min=1,max=100,dive,required"`
 }
 
 // CreatePermission godoc
@@ -386,6 +393,10 @@ func (h *Handler) CheckAuthorization(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
+	if err := bindDecisionToCaller(c, &request); err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
 	value, err := h.authorization.CheckWithAttributes(c.Request.Context(), request.TenantID, request.SubjectID, request.SubjectType, request.ResourceType, request.ResourceID, request.Action, request.Attributes)
 	if err != nil {
 		Fail(c, h.logger, err)
@@ -411,6 +422,10 @@ func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 	}
 	decisions := make([]any, 0, len(request.Checks))
 	for _, check := range request.Checks {
+		if err := bindDecisionToCaller(c, &check); err != nil {
+			Fail(c, h.logger, err)
+			return
+		}
 		decision, err := h.authorization.CheckWithAttributes(c.Request.Context(), check.TenantID, check.SubjectID, check.SubjectType, check.ResourceType, check.ResourceID, check.Action, check.Attributes)
 		if err != nil {
 			Fail(c, h.logger, err)
@@ -419,4 +434,52 @@ func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 		decisions = append(decisions, decision)
 	}
 	OK(c, gin.H{"decisions": decisions})
+}
+
+// CheckMyPermissionCodes godoc
+// @Summary Check up to 100 permission codes for the authenticated tenant membership
+// @Tags authorization-decisions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body CheckMyPermissionCodesRequest true "Tenant and permission codes"
+// @Success 200 {object} Response{body=authorization.PermissionCodeDecision}
+// @Router /api/v1/authorization/my-permissions/check [post]
+func (h *Handler) CheckMyPermissionCodes(c *gin.Context) {
+	var request CheckMyPermissionCodesRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	caller, ok := principal.FromContext(c.Request.Context())
+	if !ok || caller.Type != principal.TypeUser || strings.TrimSpace(caller.MembershipID) == "" || strings.TrimSpace(caller.TenantID) != strings.TrimSpace(request.TenantID) {
+		Fail(c, h.logger, apperror.Forbidden("tenant-scoped user membership is required"))
+		return
+	}
+	decision, err := h.authorization.CheckPermissionCodes(c.Request.Context(), request.TenantID, caller.MembershipID, "membership", request.PermissionCodes)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, decision)
+}
+
+func bindDecisionToCaller(c *gin.Context, request *CheckAuthorizationRequest) error {
+	caller, ok := principal.FromContext(c.Request.Context())
+	if !ok {
+		return apperror.Unauthorized("authenticated caller is required")
+	}
+	if caller.Type != principal.TypeUser {
+		return nil
+	}
+	tenantID := strings.TrimSpace(request.TenantID)
+	if tenantID == "__platform__" && request.SubjectType == "user" && request.SubjectID == caller.ID {
+		return nil
+	}
+	if tenantID != strings.TrimSpace(caller.TenantID) || strings.TrimSpace(caller.MembershipID) == "" {
+		return apperror.Forbidden("authorization subject must match the authenticated tenant membership")
+	}
+	request.SubjectID = caller.MembershipID
+	request.SubjectType = "membership"
+	return nil
 }

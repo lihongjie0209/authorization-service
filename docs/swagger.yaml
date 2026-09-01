@@ -27,6 +27,15 @@ definitions:
       version:
         type: integer
     type: object
+  authorization.PermissionCodeDecision:
+    properties:
+      allowed_codes:
+        items:
+          type: string
+        type: array
+      policy_version:
+        type: integer
+    type: object
   buildinfo.Info:
     properties:
       build_time:
@@ -103,6 +112,20 @@ definitions:
     - resource_type
     - subject_id
     - subject_type
+    - tenant_id
+    type: object
+  httptransport.CheckMyPermissionCodesRequest:
+    properties:
+      permission_codes:
+        items:
+          type: string
+        maxItems: 100
+        minItems: 1
+        type: array
+      tenant_id:
+        type: string
+    required:
+    - permission_codes
     - tenant_id
     type: object
   httptransport.CreateBindingRequest:
@@ -429,6 +452,34 @@ paths:
       security:
       - Bearer: []
       summary: Preview an authorization decision
+      tags:
+      - authorization-decisions
+  /api/v1/authorization/my-permissions/check:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Tenant and permission codes
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.CheckMyPermissionCodesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/authorization.PermissionCodeDecision'
+              type: object
+      security:
+      - Bearer: []
+      summary: Check up to 100 permission codes for the authenticated tenant membership
       tags:
       - authorization-decisions
   /api/v1/authorization/permissions/create:

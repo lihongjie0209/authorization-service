@@ -34,6 +34,7 @@ type Repository interface {
 	UpdateBinding(context.Context, sqlx.ExtContext, Binding) error
 	ListBindings(context.Context, string, string, string, int, int) ([]Binding, int64, error)
 	Resolve(context.Context, string, string, string, string, string) ([]resolvedGrant, uint64, error)
+	ResolvePermissionCodes(context.Context, string, string, string, []string) ([]resolvedPermissionCodeGrant, uint64, error)
 	BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error)
 	AddOutbox(context.Context, sqlx.ExtContext, OutboxEvent) error
 }
@@ -41,6 +42,13 @@ type Repository interface {
 type resolvedGrant struct {
 	DataScope           string `db:"data_scope"`
 	OrganizationUnitID  string `db:"organization_unit_id"`
+	ConditionExpression string `db:"condition_expression"`
+}
+
+type resolvedPermissionCodeGrant struct {
+	Code                string `db:"code"`
+	ResourceType        string `db:"resource_type"`
+	Action              string `db:"action"`
 	ConditionExpression string `db:"condition_expression"`
 }
 
@@ -177,6 +185,26 @@ func (r *SQLRepository) Resolve(ctx context.Context, tenantID, subjectID, subjec
 	if errors.Is(err, sql.ErrNoRows) {
 		version = 0
 		err = nil
+	}
+	if err != nil {
+		return nil, 0, fmt.Errorf("select policy version: %w", err)
+	}
+	return grants, version, nil
+}
+
+func (r *SQLRepository) ResolvePermissionCodes(ctx context.Context, tenantID, subjectID, subjectType string, codes []string) ([]resolvedPermissionCodeGrant, uint64, error) {
+	query, args, err := sqlx.In("SELECT DISTINCT p.code, p.resource_type, p.action, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id JOIN role_permissions rp ON rp.role_id = r.id JOIN permissions p ON p.id = rp.permission_id WHERE rb.tenant_id = ? AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active'))) AND (p.code IN (?) OR (p.resource_type = '*' AND p.action = '*')) AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'", tenantID, subjectID, subjectType, subjectType, subjectID, codes)
+	if err != nil {
+		return nil, 0, fmt.Errorf("build permission code query: %w", err)
+	}
+	grants := make([]resolvedPermissionCodeGrant, 0)
+	if err := r.db.SelectContext(ctx, &grants, r.db.Rebind(query), args...); err != nil {
+		return nil, 0, fmt.Errorf("resolve permission code grants: %w", err)
+	}
+	var version uint64
+	err = r.db.GetContext(ctx, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"), tenantID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return grants, 0, nil
 	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("select policy version: %w", err)
