@@ -241,6 +241,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/authorization/my-permission-catalog/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-permissions"
+                ],
+                "summary": "Search permissions available to the authenticated tenant or platform administrator",
+                "parameters": [
+                    {
+                        "description": "Selected tenant, permission scope, search and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListMyPermissionCatalogRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Permission catalog access denied",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/my-permissions/check": {
             "post": {
                 "security": [
@@ -1105,6 +1149,35 @@ const docTemplate = `{
                 },
                 "subject_type": {
                     "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.ListMyPermissionCatalogRequest": {
+            "type": "object",
+            "required": [
+                "permission_scope",
+                "tenant_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "search": {
+                    "type": "string",
+                    "maxLength": 100
                 },
                 "tenant_id": {
                     "type": "string"

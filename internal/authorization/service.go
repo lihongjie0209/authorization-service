@@ -83,6 +83,19 @@ func (s *Service) ListPermissions(ctx context.Context, tenantID string, page, pa
 	return Page[Permission]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
+func (s *Service) ListPermissionCatalog(ctx context.Context, tenantID, search string, page, pageSize int) (Page[Permission], error) {
+	tenantID, search = strings.TrimSpace(tenantID), strings.TrimSpace(search)
+	if tenantID == "" || len(search) > 100 {
+		return Page[Permission]{}, apperror.Invalid("invalid permission catalog query", nil)
+	}
+	page, pageSize, err := normalizePage(page, pageSize)
+	if err != nil {
+		return Page[Permission]{}, err
+	}
+	items, total, err := s.repository.ListPermissionCatalog(ctx, tenantID, search, pageSize, (page-1)*pageSize)
+	return Page[Permission]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
+}
+
 func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpression, status string, version int64) (Permission, error) {
 	id, name = strings.TrimSpace(id), strings.TrimSpace(name)
 	conditionExpression, status = strings.TrimSpace(conditionExpression), strings.ToLower(strings.TrimSpace(status))

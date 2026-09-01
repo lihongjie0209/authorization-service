@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +20,9 @@ type fakeRepository struct {
 	resolvedSubject     string
 	resolvedSubjectType string
 	codeGrants          []resolvedPermissionCodeGrant
+	catalogItems        []Permission
+	catalogTenant       string
+	catalogSearch       string
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
@@ -29,6 +33,10 @@ func (*fakeRepository) UpdatePermission(context.Context, sqlx.ExtContext, Permis
 }
 func (*fakeRepository) ListPermissions(context.Context, string, int, int) ([]Permission, int64, error) {
 	return nil, 0, nil
+}
+func (f *fakeRepository) ListPermissionCatalog(_ context.Context, tenantID, search string, _, _ int) ([]Permission, int64, error) {
+	f.catalogTenant, f.catalogSearch = tenantID, search
+	return f.catalogItems, int64(len(f.catalogItems)), nil
 }
 func (*fakeRepository) CreateRole(context.Context, sqlx.ExtContext, Role) error { return nil }
 func (*fakeRepository) GetRole(context.Context, string) (Role, error)           { return Role{}, ErrNotFound }
@@ -89,6 +97,22 @@ func TestService_CheckDeniesWithoutGrant(t *testing.T) {
 	}
 	if decision.Allowed || decision.DataScope != "none" || decision.PolicyVersion != 7 || decision.DecisionID == "" {
 		t.Fatalf("decision = %+v", decision)
+	}
+}
+
+func TestService_ListPermissionCatalogUsesBoundedSearch(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{catalogItems: []Permission{{Code: "application.read"}}}
+	service := NewService(repository, &database.Transactor{})
+	page, err := service.ListPermissionCatalog(t.Context(), " tenant-1 ", " application ", 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.catalogTenant != "tenant-1" || repository.catalogSearch != "application" || len(page.Items) != 1 {
+		t.Fatalf("catalog tenant=%q search=%q page=%+v", repository.catalogTenant, repository.catalogSearch, page)
+	}
+	if _, err := service.ListPermissionCatalog(t.Context(), "tenant-1", strings.Repeat("x", 101), 1, 20); err == nil {
+		t.Fatal("oversized search must fail")
 	}
 }
 

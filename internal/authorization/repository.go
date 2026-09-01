@@ -21,6 +21,7 @@ type Repository interface {
 	CreatePermission(context.Context, sqlx.ExtContext, Permission) error
 	UpdatePermission(context.Context, sqlx.ExtContext, Permission) error
 	ListPermissions(context.Context, string, int, int) ([]Permission, int64, error)
+	ListPermissionCatalog(context.Context, string, string, int, int) ([]Permission, int64, error)
 	CreateRole(context.Context, sqlx.ExtContext, Role) error
 	GetRole(context.Context, string) (Role, error)
 	UpdateRole(context.Context, sqlx.ExtContext, Role) error
@@ -78,6 +79,22 @@ func (r *SQLRepository) ListPermissions(ctx context.Context, tenantID string, li
 	}
 	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE tenant_id = ? ORDER BY code, id LIMIT ? OFFSET ?"), tenantID, limit, offset); err != nil {
 		return nil, 0, fmt.Errorf("list permissions: %w", err)
+	}
+	return items, total, nil
+}
+
+func (r *SQLRepository) ListPermissionCatalog(ctx context.Context, tenantID, search string, limit, offset int) ([]Permission, int64, error) {
+	items := make([]Permission, 0)
+	pattern := "%" + strings.ToLower(strings.TrimSpace(search)) + "%"
+	where := "tenant_id = ? AND status = 'active' AND (? = '%%' OR LOWER(code) LIKE ? OR LOWER(name) LIKE ? OR LOWER(resource_type) LIKE ? OR LOWER(action) LIKE ?)"
+	args := []any{tenantID, pattern, pattern, pattern, pattern, pattern}
+	var total int64
+	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM permissions WHERE "+where), args...); err != nil {
+		return nil, 0, fmt.Errorf("count permission catalog: %w", err)
+	}
+	listArgs := append(args, limit, offset)
+	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE "+where+" ORDER BY code, id LIMIT ? OFFSET ?"), listArgs...); err != nil {
+		return nil, 0, fmt.Errorf("list permission catalog: %w", err)
 	}
 	return items, total, nil
 }

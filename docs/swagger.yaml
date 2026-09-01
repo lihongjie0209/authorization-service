@@ -218,6 +218,26 @@ definitions:
     required:
     - tenant_id
     type: object
+  httptransport.ListMyPermissionCatalogRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      search:
+        maxLength: 100
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - tenant_id
+    type: object
   httptransport.ListPermissionsRequest:
     properties:
       page:
@@ -459,6 +479,34 @@ paths:
       summary: Preview an authorization decision
       tags:
       - authorization-decisions
+  /api/v1/authorization/my-permission-catalog/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Selected tenant, permission scope, search and pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListMyPermissionCatalogRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+        "403":
+          description: Permission catalog access denied
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Search permissions available to the authenticated tenant or platform
+        administrator
+      tags:
+      - authorization-permissions
   /api/v1/authorization/my-permissions/check:
     post:
       consumes:

@@ -22,6 +22,13 @@ type ListPermissionsRequest struct {
 	Page     int    `json:"page"`
 	PageSize int    `json:"page_size"`
 }
+type ListMyPermissionCatalogRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Search          string `json:"search" binding:"max=100"`
+	Page            int    `json:"page"`
+	PageSize        int    `json:"page_size"`
+}
 type UpdatePermissionRequest struct {
 	PermissionID        string `json:"permission_id" binding:"required"`
 	Name                string `json:"name" binding:"required"`
@@ -165,6 +172,49 @@ func (h *Handler) ListPermissions(c *gin.Context) {
 		return
 	}
 	value, err := h.authorization.ListPermissions(c.Request.Context(), request.TenantID, request.Page, request.PageSize)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// ListMyPermissionCatalog godoc
+// @Summary Search permissions available to the authenticated tenant or platform administrator
+// @Tags authorization-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body ListMyPermissionCatalogRequest true "Selected tenant, permission scope, search and pagination"
+// @Success 200 {object} Response
+// @Failure 403 {object} Response "Permission catalog access denied"
+// @Router /api/v1/authorization/my-permission-catalog/list [post]
+func (h *Handler) ListMyPermissionCatalog(c *gin.Context) {
+	var request ListMyPermissionCatalogRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	caller, ok := principal.FromContext(c.Request.Context())
+	if !ok {
+		Fail(c, h.logger, apperror.Unauthorized("authenticated caller is required"))
+		return
+	}
+	tenantID, subjectID, subjectType, err := currentPermissionSubject(caller, request.TenantID, request.PermissionScope)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	decision, err := h.authorization.CheckWithAttributes(c.Request.Context(), tenantID, subjectID, subjectType, "authorization.permission", "", "list", nil)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	if !decision.Allowed {
+		Fail(c, h.logger, apperror.Forbidden("permission catalog access denied"))
+		return
+	}
+	value, err := h.authorization.ListPermissionCatalog(c.Request.Context(), tenantID, request.Search, request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return

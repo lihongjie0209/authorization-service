@@ -64,6 +64,7 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 	api.POST("/authorization/permissions/create", handler.CreatePermission)
 	api.POST("/authorization/permissions/update", handler.UpdatePermission)
 	api.POST("/authorization/permissions/list", handler.ListPermissions)
+	api.POST("/authorization/my-permission-catalog/list", handler.ListMyPermissionCatalog)
 	api.POST("/authorization/roles/create", handler.CreateRole)
 	api.POST("/authorization/roles/update", handler.UpdateRole)
 	api.POST("/authorization/roles/list", handler.ListRoles)

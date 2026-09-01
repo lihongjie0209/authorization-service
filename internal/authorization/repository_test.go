@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,36 @@ func TestSQLRepositoryResolveIncludesWildcardPermissions(t *testing.T) {
 	}
 	if len(grants) != 1 || grants[0].DataScope != "all" || version != 1 {
 		t.Fatalf("Resolve() = %+v, %d", grants, version)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLRepositoryListPermissionCatalogScopesSearchAndActiveStatus(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	pattern := "%invoice%"
+	where := "tenant_id = ? AND status = 'active' AND (? = '%%' OR LOWER(code) LIKE ? OR LOWER(name) LIKE ? OR LOWER(resource_type) LIKE ? OR LOWER(action) LIKE ?)"
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM permissions WHERE "+where))).
+		WithArgs("tenant-1", pattern, pattern, pattern, pattern, pattern).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE "+where+" ORDER BY code, id LIMIT ? OFFSET ?"))).
+		WithArgs("tenant-1", pattern, pattern, pattern, pattern, pattern, 20, 0).
+		WillReturnRows(sqlmock.NewRows(strings.Split(permissionColumns, ", ")).AddRow("permission-1", "tenant-1", "invoice.read", "Read invoices", "invoice", "read", "active", 1, time.Now(), time.Now(), "user-1", "user-1", ""))
+
+	items, total, err := repository.ListPermissionCatalog(t.Context(), "tenant-1", " Invoice ", 20, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(items) != 1 || items[0].Code != "invoice.read" {
+		t.Fatalf("items=%+v total=%d", items, total)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

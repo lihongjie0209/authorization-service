@@ -123,6 +123,7 @@ Redsync does not start a hidden renewal goroutine. Long-running jobs must call `
 - `GET|POST /ready`: database and Redis readiness with independent timeouts
 - `GET /metrics`: Prometheus metrics when enabled
 - `POST /api/v1/version`: version, commit, build time, start time and uptime
+- `POST /api/v1/authorization/my-permission-catalog/list`: searchable active permission catalog for the authenticated tenant or platform scope; the server derives the target subject from the JWT and performs a scope-specific authorization decision
 - `POST /api/v1/users/create|get|list|update|delete`: JWT-protected CRUD example
 - `GET /swagger/index.html`: generated Swagger UI when enabled
 
