@@ -122,6 +122,11 @@ definitions:
         maxItems: 100
         minItems: 1
         type: array
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
       tenant_id:
         type: string
     required:
@@ -479,7 +484,7 @@ paths:
               type: object
       security:
       - Bearer: []
-      summary: Check up to 100 permission codes for the authenticated tenant membership
+      summary: Check up to 100 scoped permission codes for the authenticated user
       tags:
       - authorization-decisions
   /api/v1/authorization/permissions/create:

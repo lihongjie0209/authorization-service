@@ -99,6 +99,7 @@ type BatchCheckAuthorizationRequest struct {
 }
 type CheckMyPermissionCodesRequest struct {
 	TenantID        string   `json:"tenant_id" binding:"required"`
+	PermissionScope string   `json:"permission_scope" enums:"tenant,platform"`
 	PermissionCodes []string `json:"permission_codes" binding:"required,min=1,max=100,dive,required"`
 }
 
@@ -437,7 +438,7 @@ func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 }
 
 // CheckMyPermissionCodes godoc
-// @Summary Check up to 100 permission codes for the authenticated tenant membership
+// @Summary Check up to 100 scoped permission codes for the authenticated user
 // @Tags authorization-decisions
 // @Accept json
 // @Produce json
@@ -452,16 +453,40 @@ func (h *Handler) CheckMyPermissionCodes(c *gin.Context) {
 		return
 	}
 	caller, ok := principal.FromContext(c.Request.Context())
-	if !ok || caller.Type != principal.TypeUser || strings.TrimSpace(caller.MembershipID) == "" || strings.TrimSpace(caller.TenantID) != strings.TrimSpace(request.TenantID) {
-		Fail(c, h.logger, apperror.Forbidden("tenant-scoped user membership is required"))
+	if !ok {
+		Fail(c, h.logger, apperror.Unauthorized("authenticated caller is required"))
 		return
 	}
-	decision, err := h.authorization.CheckPermissionCodes(c.Request.Context(), request.TenantID, caller.MembershipID, "membership", request.PermissionCodes)
+	tenantID, subjectID, subjectType, subjectErr := currentPermissionSubject(caller, request.TenantID, request.PermissionScope)
+	if subjectErr != nil {
+		Fail(c, h.logger, subjectErr)
+		return
+	}
+	decision, err := h.authorization.CheckPermissionCodes(c.Request.Context(), tenantID, subjectID, subjectType, request.PermissionCodes)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
 	}
 	OK(c, decision)
+}
+
+func currentPermissionSubject(caller principal.Principal, selectedTenantID, scope string) (string, string, string, error) {
+	selectedTenantID = strings.TrimSpace(selectedTenantID)
+	scope = strings.ToLower(strings.TrimSpace(scope))
+	if scope == "" {
+		scope = "tenant"
+	}
+	if caller.Type != principal.TypeUser || strings.TrimSpace(caller.MembershipID) == "" || strings.TrimSpace(caller.TenantID) != selectedTenantID {
+		return "", "", "", apperror.Forbidden("tenant-scoped user membership is required")
+	}
+	switch scope {
+	case "tenant":
+		return selectedTenantID, caller.MembershipID, "membership", nil
+	case "platform":
+		return "__platform__", caller.ID, "user", nil
+	default:
+		return "", "", "", apperror.Invalid("permission_scope must be tenant or platform", nil)
+	}
 }
 
 func bindDecisionToCaller(c *gin.Context, request *CheckAuthorizationRequest) error {

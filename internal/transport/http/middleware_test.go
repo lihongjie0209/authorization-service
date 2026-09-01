@@ -58,6 +58,36 @@ func TestBindDecisionToCallerUsesTrustedTenantMembership(t *testing.T) {
 	}
 }
 
+func TestCurrentPermissionSubjectSeparatesTenantAndPlatformScopes(t *testing.T) {
+	t.Parallel()
+	caller := principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"}
+	for _, test := range []struct {
+		name        string
+		scope       string
+		wantTenant  string
+		wantSubject string
+		wantType    string
+	}{
+		{name: "legacy defaults to tenant", wantTenant: "tenant-1", wantSubject: "membership-1", wantType: "membership"},
+		{name: "tenant", scope: "tenant", wantTenant: "tenant-1", wantSubject: "membership-1", wantType: "membership"},
+		{name: "platform", scope: "platform", wantTenant: "__platform__", wantSubject: "user-1", wantType: "user"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			tenantID, subjectID, subjectType, err := currentPermissionSubject(caller, "tenant-1", test.scope)
+			if err != nil || tenantID != test.wantTenant || subjectID != test.wantSubject || subjectType != test.wantType {
+				t.Fatalf("subject=(%q,%q,%q) err=%v", tenantID, subjectID, subjectType, err)
+			}
+		})
+	}
+	if _, _, _, err := currentPermissionSubject(caller, "tenant-2", "platform"); err == nil {
+		t.Fatal("platform lookup must still require the selected tenant token context")
+	}
+	if _, _, _, err := currentPermissionSubject(caller, "tenant-1", "global"); err == nil {
+		t.Fatal("unknown scope must fail")
+	}
+}
+
 func TestAuthorizationFailsClosedAndClassifiesOutage(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)

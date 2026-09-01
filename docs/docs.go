@@ -257,7 +257,7 @@ const docTemplate = `{
                 "tags": [
                     "authorization-decisions"
                 ],
-                "summary": "Check up to 100 permission codes for the authenticated tenant membership",
+                "summary": "Check up to 100 scoped permission codes for the authenticated user",
                 "parameters": [
                     {
                         "description": "Tenant and permission codes",
@@ -974,6 +974,13 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
                 },
                 "tenant_id": {
                     "type": "string"
