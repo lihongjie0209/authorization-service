@@ -80,6 +80,30 @@ type ListRolesRequest struct {
 	Page     int    `json:"page"`
 	PageSize int    `json:"page_size"`
 }
+type CreateMyRoleRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Code            string `json:"code" binding:"required"`
+	Name            string `json:"name" binding:"required"`
+	Description     string `json:"description"`
+	DataScope       string `json:"data_scope" binding:"required"`
+}
+type UpdateMyRoleRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	RoleID          string `json:"role_id" binding:"required"`
+	Name            string `json:"name" binding:"required"`
+	Description     string `json:"description"`
+	DataScope       string `json:"data_scope" binding:"required"`
+	Status          string `json:"status" binding:"required"`
+	Version         int64  `json:"version" binding:"required,gt=0"`
+}
+type ListMyRolesRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Page            int    `json:"page"`
+	PageSize        int    `json:"page_size"`
+}
 type GrantRolePermissionRequest struct {
 	TenantID     string `json:"tenant_id" binding:"required"`
 	RoleID       string `json:"role_id" binding:"required"`
@@ -398,6 +422,96 @@ func (h *Handler) ListRoles(c *gin.Context) {
 		return
 	}
 	value, err := h.authorization.ListRoles(c.Request.Context(), request.TenantID, request.Page, request.PageSize)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+func (h *Handler) authorizeUserRoleManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
+	ctx, targetTenantID, err := h.authorization.AuthorizeUserManagementScope(c.Request.Context(), tenantID, scope, "authorization.role", action)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return "", false
+	}
+	c.Request = c.Request.WithContext(ctx)
+	return targetTenantID, true
+}
+
+// CreateMyRole godoc
+// @Summary Create a role in the authenticated user's tenant or platform scope
+// @Tags authorization-roles
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body CreateMyRoleRequest true "Scoped role"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-roles/create [post]
+func (h *Handler) CreateMyRole(c *gin.Context) {
+	var request CreateMyRoleRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "create")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.CreateRole(c.Request.Context(), tenantID, request.Code, request.Name, request.Description, request.DataScope)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// UpdateMyRole godoc
+// @Summary Update a role in the authenticated user's tenant or platform scope
+// @Tags authorization-roles
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body UpdateMyRoleRequest true "Scoped role update"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-roles/update [post]
+func (h *Handler) UpdateMyRole(c *gin.Context) {
+	var request UpdateMyRoleRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "update"); !ok {
+		return
+	}
+	value, err := h.authorization.UpdateRole(c.Request.Context(), request.RoleID, request.Name, request.Description, request.DataScope, request.Status, request.Version)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// ListMyRoles godoc
+// @Summary List roles in the authenticated user's tenant or platform scope
+// @Tags authorization-roles
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body ListMyRolesRequest true "Scoped role pagination"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-roles/list [post]
+func (h *Handler) ListMyRoles(c *gin.Context) {
+	var request ListMyRolesRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "list")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.ListRoles(c.Request.Context(), tenantID, request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return

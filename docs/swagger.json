@@ -446,6 +446,120 @@
                 }
             }
         },
+        "/api/v1/authorization/my-roles/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Create a role in the authenticated user's tenant or platform scope",
+                "parameters": [
+                    {
+                        "description": "Scoped role",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CreateMyRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/my-roles/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "List roles in the authenticated user's tenant or platform scope",
+                "parameters": [
+                    {
+                        "description": "Scoped role pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListMyRolesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/my-roles/update": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Update a role in the authenticated user's tenant or platform scope",
+                "parameters": [
+                    {
+                        "description": "Scoped role update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.UpdateMyRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/permissions/create": {
             "post": {
                 "security": [
@@ -1206,6 +1320,40 @@
                 }
             }
         },
+        "httptransport.CreateMyRoleRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "data_scope",
+                "name",
+                "permission_scope",
+                "tenant_id"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "data_scope": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httptransport.CreatePermissionRequest": {
             "type": "object",
             "required": [
@@ -1358,6 +1506,31 @@
                 }
             }
         },
+        "httptransport.ListMyRolesRequest": {
+            "type": "object",
+            "required": [
+                "permission_scope",
+                "tenant_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httptransport.ListPermissionsRequest": {
             "type": "object",
             "required": [
@@ -1482,6 +1655,48 @@
                         "tenant",
                         "platform"
                     ]
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.UpdateMyRoleRequest": {
+            "type": "object",
+            "required": [
+                "data_scope",
+                "name",
+                "permission_scope",
+                "role_id",
+                "status",
+                "tenant_id",
+                "version"
+            ],
+            "properties": {
+                "data_scope": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "role_id": {
+                    "type": "string"
                 },
                 "status": {
                     "type": "string"

@@ -178,6 +178,30 @@ definitions:
     - resource_type
     - tenant_id
     type: object
+  httptransport.CreateMyRoleRequest:
+    properties:
+      code:
+        type: string
+      data_scope:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - code
+    - data_scope
+    - name
+    - permission_scope
+    - tenant_id
+    type: object
   httptransport.CreatePermissionRequest:
     properties:
       action:
@@ -282,6 +306,23 @@ definitions:
     - permission_scope
     - tenant_id
     type: object
+  httptransport.ListMyRolesRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - tenant_id
+    type: object
   httptransport.ListPermissionsRequest:
     properties:
       page:
@@ -369,6 +410,36 @@ definitions:
     - name
     - permission_id
     - permission_scope
+    - status
+    - tenant_id
+    - version
+    type: object
+  httptransport.UpdateMyRoleRequest:
+    properties:
+      data_scope:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_id:
+        type: string
+      status:
+        type: string
+      tenant_id:
+        type: string
+      version:
+        type: integer
+    required:
+    - data_scope
+    - name
+    - permission_scope
+    - role_id
     - status
     - tenant_id
     - version
@@ -677,6 +748,75 @@ paths:
         scope
       tags:
       - authorization-permissions
+  /api/v1/authorization/my-roles/create:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.CreateMyRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Create a role in the authenticated user's tenant or platform scope
+      tags:
+      - authorization-roles
+  /api/v1/authorization/my-roles/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListMyRolesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: List roles in the authenticated user's tenant or platform scope
+      tags:
+      - authorization-roles
+  /api/v1/authorization/my-roles/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.UpdateMyRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Update a role in the authenticated user's tenant or platform scope
+      tags:
+      - authorization-roles
   /api/v1/authorization/permissions/create:
     post:
       consumes:
