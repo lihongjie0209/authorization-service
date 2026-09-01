@@ -17,7 +17,9 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	"github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/microservice-platform-go/audit"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
@@ -48,11 +50,35 @@ func NewService(repository Repository, transactor *database.Transactor) *Service
 	return &Service{repository: repository, transactor: transactor, now: time.Now, cel: environment, cacheTTL: 30 * time.Second, cache: make(map[string]decisionCacheEntry)}
 }
 
+func enforceInteractiveTenant(ctx context.Context, targetTenantID string) error {
+	caller, ok := principal.FromContext(ctx)
+	if !ok || strings.TrimSpace(caller.ID) == "" {
+		return apperror.Unauthorized("authenticated caller is required")
+	}
+	if caller.Type != principal.TypeUser {
+		return nil
+	}
+	expectedTenantID := platformauthz.PlatformTenantID
+	if strings.TrimSpace(caller.TenantID) != "" {
+		if strings.TrimSpace(caller.MembershipID) == "" {
+			return apperror.Forbidden("tenant-scoped user membership is required")
+		}
+		expectedTenantID = strings.TrimSpace(caller.TenantID)
+	}
+	if strings.TrimSpace(targetTenantID) != expectedTenantID {
+		return apperror.Forbidden("authorization resource belongs to another tenant scope")
+	}
+	return nil
+}
+
 func (s *Service) CreatePermission(ctx context.Context, tenantID, code, name, resourceType, action string, conditionExpression ...string) (Permission, error) {
 	tenantID, code, name = strings.TrimSpace(tenantID), strings.ToLower(strings.TrimSpace(code)), strings.TrimSpace(name)
 	resourceType, action = strings.ToLower(strings.TrimSpace(resourceType)), strings.ToLower(strings.TrimSpace(action))
 	if tenantID == "" || code == "" || name == "" || resourceType == "" || action == "" {
 		return Permission{}, apperror.Invalid("tenant_id, code, name, resource_type and action are required", nil)
+	}
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Permission{}, err
 	}
 	condition := ""
 	if len(conditionExpression) > 0 {
@@ -75,11 +101,15 @@ func (s *Service) CreatePermission(ctx context.Context, tenantID, code, name, re
 }
 
 func (s *Service) ListPermissions(ctx context.Context, tenantID string, page, pageSize int) (Page[Permission], error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Permission]{}, err
+	}
 	page, pageSize, err := normalizePage(page, pageSize)
 	if err != nil {
 		return Page[Permission]{}, err
 	}
-	items, total, err := s.repository.ListPermissions(ctx, strings.TrimSpace(tenantID), pageSize, (page-1)*pageSize)
+	items, total, err := s.repository.ListPermissions(ctx, tenantID, pageSize, (page-1)*pageSize)
 	return Page[Permission]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
@@ -111,6 +141,9 @@ func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpre
 	if err != nil {
 		return Permission{}, translate(err)
 	}
+	if err := enforceInteractiveTenant(ctx, current.TenantID); err != nil {
+		return Permission{}, err
+	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
 		return Permission{}, apperror.Unauthorized("authenticated actor is required")
@@ -133,6 +166,9 @@ func (s *Service) CreateRole(ctx context.Context, tenantID, code, name, descript
 	if tenantID == "" || code == "" || name == "" || !validDataScope(dataScope) {
 		return Role{}, apperror.Invalid("invalid role", nil)
 	}
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Role{}, err
+	}
 	fields, err := audit.New(ctx, s.now())
 	if err != nil {
 		return Role{}, apperror.Unauthorized("authenticated actor is required")
@@ -152,6 +188,9 @@ func (s *Service) UpdateRole(ctx context.Context, id, name, description, dataSco
 	if err != nil {
 		return Role{}, translate(err)
 	}
+	if err := enforceInteractiveTenant(ctx, current.TenantID); err != nil {
+		return Role{}, err
+	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
 		return Role{}, apperror.Unauthorized("authenticated actor is required")
@@ -166,11 +205,15 @@ func (s *Service) UpdateRole(ctx context.Context, id, name, description, dataSco
 }
 
 func (s *Service) ListRoles(ctx context.Context, tenantID string, page, pageSize int) (Page[Role], error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Role]{}, err
+	}
 	page, pageSize, err := normalizePage(page, pageSize)
 	if err != nil {
 		return Page[Role]{}, err
 	}
-	items, total, err := s.repository.ListRoles(ctx, strings.TrimSpace(tenantID), pageSize, (page-1)*pageSize)
+	items, total, err := s.repository.ListRoles(ctx, tenantID, pageSize, (page-1)*pageSize)
 	return Page[Role]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
@@ -185,6 +228,9 @@ func (s *Service) GrantRolePermission(ctx context.Context, tenantID, roleID, per
 	}
 	if tenantID == "" || tenantID != role.TenantID || tenantID != permission.TenantID {
 		return RolePermission{}, apperror.Invalid("role and permission must belong to tenant", nil)
+	}
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return RolePermission{}, err
 	}
 	existing, existingErr := s.repository.GetRolePermissionByPair(ctx, roleID, permissionID)
 	if existingErr == nil && existing.Status == "active" {
@@ -215,6 +261,9 @@ func (s *Service) RevokeRolePermission(ctx context.Context, id string, version i
 	if err != nil {
 		return RolePermission{}, translate(err)
 	}
+	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
+		return RolePermission{}, err
+	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
 		return RolePermission{}, apperror.Unauthorized("authenticated actor is required")
@@ -227,6 +276,13 @@ func (s *Service) RevokeRolePermission(ctx context.Context, id string, version i
 	return s.repository.GetRolePermission(ctx, id)
 }
 func (s *Service) ListRolePermissions(ctx context.Context, roleID string) ([]RolePermission, error) {
+	role, err := s.repository.GetRole(ctx, roleID)
+	if err != nil {
+		return nil, translate(err)
+	}
+	if err := enforceInteractiveTenant(ctx, role.TenantID); err != nil {
+		return nil, err
+	}
 	values, err := s.repository.ListRolePermissions(ctx, roleID)
 	return values, translate(err)
 }
@@ -239,6 +295,9 @@ func (s *Service) CreateBinding(ctx context.Context, tenantID, subjectID, subjec
 	subjectType = strings.ToLower(strings.TrimSpace(subjectType))
 	if tenantID == "" || subjectID == "" || role.TenantID != tenantID || !validSubjectType(subjectType) {
 		return Binding{}, apperror.Invalid("invalid role binding", nil)
+	}
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Binding{}, err
 	}
 	fields, err := audit.New(ctx, s.now())
 	if err != nil {
@@ -256,6 +315,9 @@ func (s *Service) RevokeBinding(ctx context.Context, id string, version int64) (
 	if err != nil {
 		return Binding{}, translate(err)
 	}
+	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
+		return Binding{}, err
+	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
 		return Binding{}, apperror.Unauthorized("authenticated actor is required")
@@ -269,6 +331,10 @@ func (s *Service) RevokeBinding(ctx context.Context, id string, version int64) (
 }
 
 func (s *Service) ListBindings(ctx context.Context, tenantID, subjectID, subjectType string, page, pageSize int) (Page[Binding], error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Binding]{}, err
+	}
 	page, pageSize, err := normalizePage(page, pageSize)
 	if err != nil {
 		return Page[Binding]{}, err

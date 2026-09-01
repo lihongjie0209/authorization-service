@@ -9,6 +9,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	"github.com/lihongjie0209/authorization-service/internal/database"
+	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 )
 
@@ -23,6 +25,7 @@ type fakeRepository struct {
 	catalogItems        []Permission
 	catalogTenant       string
 	catalogSearch       string
+	role                *Role
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
@@ -39,7 +42,12 @@ func (f *fakeRepository) ListPermissionCatalog(_ context.Context, tenantID, sear
 	return f.catalogItems, int64(len(f.catalogItems)), nil
 }
 func (*fakeRepository) CreateRole(context.Context, sqlx.ExtContext, Role) error { return nil }
-func (*fakeRepository) GetRole(context.Context, string) (Role, error)           { return Role{}, ErrNotFound }
+func (f *fakeRepository) GetRole(context.Context, string) (Role, error) {
+	if f.role == nil {
+		return Role{}, ErrNotFound
+	}
+	return *f.role, nil
+}
 func (*fakeRepository) UpdateRole(context.Context, sqlx.ExtContext, Role) error { return nil }
 func (*fakeRepository) ListRoles(context.Context, string, int, int) ([]Role, int64, error) {
 	return nil, 0, nil
@@ -97,6 +105,38 @@ func TestService_CheckDeniesWithoutGrant(t *testing.T) {
 	}
 	if decision.Allowed || decision.DataScope != "none" || decision.PolicyVersion != 7 || decision.DecisionID == "" {
 		t.Fatalf("decision = %+v", decision)
+	}
+}
+
+func TestEnforceInteractiveTenantBindsUsersAndAllowsTrustedServices(t *testing.T) {
+	t.Parallel()
+	tenantUser := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	if err := enforceInteractiveTenant(tenantUser, "tenant-1"); err != nil {
+		t.Fatalf("matching tenant: %v", err)
+	}
+	if err := enforceInteractiveTenant(tenantUser, "tenant-2"); err == nil {
+		t.Fatal("cross-tenant user access must fail")
+	}
+	platformUser := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser})
+	if err := enforceInteractiveTenant(platformUser, platformauthz.PlatformTenantID); err != nil {
+		t.Fatalf("platform namespace: %v", err)
+	}
+	if err := enforceInteractiveTenant(platformUser, "tenant-1"); err == nil {
+		t.Fatal("unscoped platform user must not select a tenant namespace")
+	}
+	serviceCaller := principal.WithContext(t.Context(), principal.Principal{ID: "provisioner", Type: principal.TypeServiceAccount})
+	if err := enforceInteractiveTenant(serviceCaller, "tenant-2"); err != nil {
+		t.Fatalf("trusted service scope is governed by its service authorization: %v", err)
+	}
+}
+
+func TestService_UpdateRoleRejectsCrossTenantResourceID(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{role: &Role{ID: "role-2", TenantID: "tenant-2", Name: "Other role", DataScope: "tenant", Status: "active", AuditFields: AuditFields{Version: 1}}}
+	service := NewService(repository, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	if _, err := service.UpdateRole(ctx, "role-2", "Changed", "", "tenant", "active", 1); err == nil {
+		t.Fatal("cross-tenant role ID must be rejected before update")
 	}
 }
 
