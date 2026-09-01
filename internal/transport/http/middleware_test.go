@@ -32,7 +32,7 @@ func TestAuthorizationHTTPRequirementCoversManagementAndExcludesDecisions(t *tes
 			t.Fatalf("route %q requirement = %+v, %v", route, requirement, ok)
 		}
 	}
-	for _, route := range []string{"/api/v1/authorization/check", "/api/v1/authorization/batch-check", "/api/v1/authorization/my-permissions/check", "/api/v1/authorization/my-permission-catalog/list", "/api/v1/authorization/my-permissions/create", "/api/v1/authorization/my-permissions/update", "/api/v1/authorization/my-permissions/list", "/api/v1/authorization/my-roles/create", "/api/v1/authorization/my-roles/update", "/api/v1/authorization/my-roles/list", "/api/v1/version", "/api/v1/me"} {
+	for _, route := range []string{"/api/v1/authorization/check", "/api/v1/authorization/batch-check", "/api/v1/authorization/my-permissions/check", "/api/v1/authorization/my-permission-catalog/list", "/api/v1/authorization/my-permissions/create", "/api/v1/authorization/my-permissions/update", "/api/v1/authorization/my-permissions/list", "/api/v1/authorization/my-roles/create", "/api/v1/authorization/my-roles/update", "/api/v1/authorization/my-roles/list", "/api/v1/authorization/my-role-permissions/grant", "/api/v1/authorization/my-role-permissions/revoke", "/api/v1/authorization/my-role-permissions/list", "/api/v1/authorization/my-bindings/create", "/api/v1/authorization/my-bindings/revoke", "/api/v1/authorization/my-bindings/list", "/api/v1/version", "/api/v1/me"} {
 		if _, ok := authorizationHTTPRequirement(route); ok {
 			t.Fatalf("decision/operational route %q must not recurse", route)
 		}

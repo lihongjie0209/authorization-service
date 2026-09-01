@@ -310,3 +310,28 @@ func TestValidSubjectTypeIncludesPlatformUser(t *testing.T) {
 		t.Fatal("platform user subject must be accepted and mapped to protobuf")
 	}
 }
+
+func TestValidSubjectForTenantSeparatesGlobalUsersFromMemberships(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		tenantID    string
+		subjectType string
+		want        bool
+	}{
+		{name: "platform user", tenantID: platformauthz.PlatformTenantID, subjectType: "user", want: true},
+		{name: "platform service account", tenantID: platformauthz.PlatformTenantID, subjectType: "service_account", want: true},
+		{name: "platform membership rejected", tenantID: platformauthz.PlatformTenantID, subjectType: "membership"},
+		{name: "tenant membership", tenantID: "tenant-1", subjectType: "membership", want: true},
+		{name: "tenant group", tenantID: "tenant-1", subjectType: "group", want: true},
+		{name: "tenant global user rejected", tenantID: "tenant-1", subjectType: "user"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := validSubjectForTenant(test.tenantID, test.subjectType); got != test.want {
+				t.Fatalf("validSubjectForTenant(%q, %q) = %v, want %v", test.tenantID, test.subjectType, got, test.want)
+			}
+		})
+	}
+}

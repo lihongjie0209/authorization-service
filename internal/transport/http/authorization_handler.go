@@ -116,6 +116,23 @@ type RevokeRolePermissionRequest struct {
 type ListRolePermissionsRequest struct {
 	RoleID string `json:"role_id" binding:"required"`
 }
+type GrantMyRolePermissionRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	RoleID          string `json:"role_id" binding:"required"`
+	PermissionID    string `json:"permission_id" binding:"required"`
+}
+type RevokeMyRolePermissionRequest struct {
+	TenantID         string `json:"tenant_id" binding:"required"`
+	PermissionScope  string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	RolePermissionID string `json:"role_permission_id" binding:"required"`
+	Version          int64  `json:"version" binding:"required,gt=0"`
+}
+type ListMyRolePermissionsRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	RoleID          string `json:"role_id" binding:"required"`
+}
 type CreateBindingRequest struct {
 	TenantID           string `json:"tenant_id" binding:"required"`
 	SubjectID          string `json:"subject_id" binding:"required"`
@@ -133,6 +150,28 @@ type ListBindingsRequest struct {
 	SubjectType string `json:"subject_type"`
 	Page        int    `json:"page"`
 	PageSize    int    `json:"page_size"`
+}
+type CreateMyBindingRequest struct {
+	TenantID           string `json:"tenant_id" binding:"required"`
+	PermissionScope    string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	SubjectID          string `json:"subject_id" binding:"required"`
+	SubjectType        string `json:"subject_type" binding:"required"`
+	RoleID             string `json:"role_id" binding:"required"`
+	OrganizationUnitID string `json:"organization_unit_id"`
+}
+type RevokeMyBindingRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	BindingID       string `json:"binding_id" binding:"required"`
+	Version         int64  `json:"version" binding:"required,gt=0"`
+}
+type ListMyBindingsRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	SubjectID       string `json:"subject_id"`
+	SubjectType     string `json:"subject_type"`
+	Page            int    `json:"page"`
+	PageSize        int    `json:"page_size"`
 }
 type BindingPageResponseBody struct {
 	Items    []authorization.Binding `json:"items"`
@@ -588,6 +627,95 @@ func (h *Handler) ListRolePermissions(c *gin.Context) {
 	OK(c, gin.H{"role_permissions": value})
 }
 
+func (h *Handler) authorizeUserRolePermissionManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
+	ctx, targetTenantID, err := h.authorization.AuthorizeUserManagementScope(c.Request.Context(), tenantID, scope, "authorization.role-permission", action)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return "", false
+	}
+	c.Request = c.Request.WithContext(ctx)
+	return targetTenantID, true
+}
+
+// GrantMyRolePermission godoc
+// @Summary Grant a permission to a role in the current tenant or platform scope
+// @Tags authorization-role-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body GrantMyRolePermissionRequest true "Scoped role permission"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-role-permissions/grant [post]
+func (h *Handler) GrantMyRolePermission(c *gin.Context) {
+	var request GrantMyRolePermissionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserRolePermissionManagement(c, request.TenantID, request.PermissionScope, "grant")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.GrantRolePermission(c.Request.Context(), tenantID, request.RoleID, request.PermissionID)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// RevokeMyRolePermission godoc
+// @Summary Revoke a role permission in the current tenant or platform scope
+// @Tags authorization-role-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body RevokeMyRolePermissionRequest true "Scoped role permission revoke"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-role-permissions/revoke [post]
+func (h *Handler) RevokeMyRolePermission(c *gin.Context) {
+	var request RevokeMyRolePermissionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserRolePermissionManagement(c, request.TenantID, request.PermissionScope, "revoke"); !ok {
+		return
+	}
+	value, err := h.authorization.RevokeRolePermission(c.Request.Context(), request.RolePermissionID, request.Version)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// ListMyRolePermissions godoc
+// @Summary List role permissions in the current tenant or platform scope
+// @Tags authorization-role-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body ListMyRolePermissionsRequest true "Scoped role"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-role-permissions/list [post]
+func (h *Handler) ListMyRolePermissions(c *gin.Context) {
+	var request ListMyRolePermissionsRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserRolePermissionManagement(c, request.TenantID, request.PermissionScope, "list"); !ok {
+		return
+	}
+	value, err := h.authorization.ListRolePermissions(c.Request.Context(), request.RoleID)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, gin.H{"role_permissions": value})
+}
+
 // CreateBinding godoc
 // @Summary Bind a role to a membership, group, or service account
 // @Tags authorization-bindings
@@ -650,6 +778,96 @@ func (h *Handler) ListBindings(c *gin.Context) {
 		return
 	}
 	value, err := h.authorization.ListBindings(c.Request.Context(), request.TenantID, request.SubjectID, request.SubjectType, request.Page, request.PageSize)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, BindingPageResponseBody{Items: value.Items, Total: value.Total, Page: value.Page, PageSize: value.PageSize})
+}
+
+func (h *Handler) authorizeUserBindingManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
+	ctx, targetTenantID, err := h.authorization.AuthorizeUserManagementScope(c.Request.Context(), tenantID, scope, "authorization.binding", action)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return "", false
+	}
+	c.Request = c.Request.WithContext(ctx)
+	return targetTenantID, true
+}
+
+// CreateMyBinding godoc
+// @Summary Bind a role in the current tenant or platform scope
+// @Tags authorization-bindings
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body CreateMyBindingRequest true "Scoped binding"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-bindings/create [post]
+func (h *Handler) CreateMyBinding(c *gin.Context) {
+	var request CreateMyBindingRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserBindingManagement(c, request.TenantID, request.PermissionScope, "create")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.CreateBinding(c.Request.Context(), tenantID, request.SubjectID, request.SubjectType, request.RoleID, request.OrganizationUnitID)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// RevokeMyBinding godoc
+// @Summary Revoke a binding in the current tenant or platform scope
+// @Tags authorization-bindings
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body RevokeMyBindingRequest true "Scoped binding revoke"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-bindings/revoke [post]
+func (h *Handler) RevokeMyBinding(c *gin.Context) {
+	var request RevokeMyBindingRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserBindingManagement(c, request.TenantID, request.PermissionScope, "revoke"); !ok {
+		return
+	}
+	value, err := h.authorization.RevokeBinding(c.Request.Context(), request.BindingID, request.Version)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// ListMyBindings godoc
+// @Summary List bindings in the current tenant or platform scope
+// @Tags authorization-bindings
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body ListMyBindingsRequest true "Scoped binding pagination"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-bindings/list [post]
+func (h *Handler) ListMyBindings(c *gin.Context) {
+	var request ListMyBindingsRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserBindingManagement(c, request.TenantID, request.PermissionScope, "list")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.ListBindings(c.Request.Context(), tenantID, request.SubjectID, request.SubjectType, request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return

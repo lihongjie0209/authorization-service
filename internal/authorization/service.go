@@ -327,7 +327,7 @@ func (s *Service) CreateBinding(ctx context.Context, tenantID, subjectID, subjec
 		return Binding{}, translate(err)
 	}
 	subjectType = strings.ToLower(strings.TrimSpace(subjectType))
-	if tenantID == "" || subjectID == "" || role.TenantID != tenantID || !validSubjectType(subjectType) {
+	if tenantID == "" || subjectID == "" || role.TenantID != tenantID || !validSubjectForTenant(tenantID, subjectType) {
 		return Binding{}, apperror.Invalid("invalid role binding", nil)
 	}
 	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
@@ -609,6 +609,15 @@ func validSubjectType(value string) bool {
 		return true
 	}
 	return false
+}
+func validSubjectForTenant(tenantID, subjectType string) bool {
+	if !validSubjectType(subjectType) {
+		return false
+	}
+	if strings.TrimSpace(tenantID) == platformauthz.PlatformTenantID {
+		return subjectType == "user" || subjectType == "service_account"
+	}
+	return subjectType == "membership" || subjectType == "group" || subjectType == "service_account"
 }
 func scopeRank(value string) int {
 	switch value {

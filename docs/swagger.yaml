@@ -151,6 +151,30 @@ definitions:
     - subject_type
     - tenant_id
     type: object
+  httptransport.CreateMyBindingRequest:
+    properties:
+      organization_unit_id:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_id:
+        type: string
+      subject_id:
+        type: string
+      subject_type:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - role_id
+    - subject_id
+    - subject_type
+    - tenant_id
+    type: object
   httptransport.CreateMyPermissionRequest:
     properties:
       action:
@@ -241,6 +265,25 @@ definitions:
     - name
     - tenant_id
     type: object
+  httptransport.GrantMyRolePermissionRequest:
+    properties:
+      permission_id:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_id:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_id
+    - permission_scope
+    - role_id
+    - tenant_id
+    type: object
   httptransport.GrantRolePermissionRequest:
     properties:
       permission_id:
@@ -267,6 +310,27 @@ definitions:
       tenant_id:
         type: string
     required:
+    - tenant_id
+    type: object
+  httptransport.ListMyBindingsRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      subject_id:
+        type: string
+      subject_type:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
     - tenant_id
     type: object
   httptransport.ListMyPermissionCatalogRequest:
@@ -304,6 +368,22 @@ definitions:
         type: string
     required:
     - permission_scope
+    - tenant_id
+    type: object
+  httptransport.ListMyRolePermissionsRequest:
+    properties:
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_id:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - role_id
     - tenant_id
     type: object
   httptransport.ListMyRolesRequest:
@@ -375,6 +455,44 @@ definitions:
         type: integer
     required:
     - binding_id
+    - version
+    type: object
+  httptransport.RevokeMyBindingRequest:
+    properties:
+      binding_id:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      tenant_id:
+        type: string
+      version:
+        type: integer
+    required:
+    - binding_id
+    - permission_scope
+    - tenant_id
+    - version
+    type: object
+  httptransport.RevokeMyRolePermissionRequest:
+    properties:
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_permission_id:
+        type: string
+      tenant_id:
+        type: string
+      version:
+        type: integer
+    required:
+    - permission_scope
+    - role_permission_id
+    - tenant_id
     - version
     type: object
   httptransport.RevokeRolePermissionRequest:
@@ -621,6 +739,75 @@ paths:
       summary: Preview an authorization decision
       tags:
       - authorization-decisions
+  /api/v1/authorization/my-bindings/create:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped binding
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.CreateMyBindingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Bind a role in the current tenant or platform scope
+      tags:
+      - authorization-bindings
+  /api/v1/authorization/my-bindings/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped binding pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListMyBindingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: List bindings in the current tenant or platform scope
+      tags:
+      - authorization-bindings
+  /api/v1/authorization/my-bindings/revoke:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped binding revoke
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.RevokeMyBindingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Revoke a binding in the current tenant or platform scope
+      tags:
+      - authorization-bindings
   /api/v1/authorization/my-permission-catalog/list:
     post:
       consumes:
@@ -748,6 +935,75 @@ paths:
         scope
       tags:
       - authorization-permissions
+  /api/v1/authorization/my-role-permissions/grant:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role permission
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GrantMyRolePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Grant a permission to a role in the current tenant or platform scope
+      tags:
+      - authorization-role-permissions
+  /api/v1/authorization/my-role-permissions/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListMyRolePermissionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: List role permissions in the current tenant or platform scope
+      tags:
+      - authorization-role-permissions
+  /api/v1/authorization/my-role-permissions/revoke:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role permission revoke
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.RevokeMyRolePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Revoke a role permission in the current tenant or platform scope
+      tags:
+      - authorization-role-permissions
   /api/v1/authorization/my-roles/create:
     post:
       consumes:
