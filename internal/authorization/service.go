@@ -295,11 +295,10 @@ func (s *Service) CheckPermissionCodes(ctx context.Context, tenantID, subjectID,
 	allowed := make(map[string]struct{}, len(grants))
 	allowAll := false
 	for _, grant := range grants {
-		matched, matchErr := s.matchesCondition(grant.ConditionExpression, tenantID, subjectID, "", nil)
-		if matchErr != nil {
-			return PermissionCodeDecision{}, apperror.Internal(matchErr)
-		}
-		if !matched {
+		// Navigation has no concrete resource or request attributes. Conditional
+		// grants cannot be proven here and therefore remain hidden; the domain API
+		// evaluates them later with its authoritative facts.
+		if strings.TrimSpace(grant.ConditionExpression) != "" {
 			continue
 		}
 		if grant.ResourceType == "*" && grant.Action == "*" {

@@ -112,6 +112,22 @@ func TestService_CheckPermissionCodesHonorsWildcardRole(t *testing.T) {
 	}
 }
 
+func TestService_CheckPermissionCodesHidesConditionalGrantWithoutResourceFacts(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{codeGrants: []resolvedPermissionCodeGrant{{
+		Code:                "invoice.approve",
+		ConditionExpression: `attributes["department"] == "finance" && resource_id.startsWith("invoice-")`,
+	}}}
+	service := NewService(repository, &database.Transactor{})
+	decision, err := service.CheckPermissionCodes(t.Context(), "tenant-1", "membership-1", "membership", []string{"invoice.approve"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decision.AllowedCodes) != 0 {
+		t.Fatalf("decision = %+v, conditional grant must fail closed", decision)
+	}
+}
+
 func TestService_CheckChoosesBroadestScopeAndDeduplicatesOrganizations(t *testing.T) {
 	t.Parallel()
 	repository := &fakeRepository{policyVersion: 8, grants: []resolvedGrant{{DataScope: "organization", OrganizationUnitID: "org-1"}, {DataScope: "self"}, {DataScope: "organization", OrganizationUnitID: "org-1"}, {DataScope: "tenant"}}}
