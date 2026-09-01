@@ -72,6 +72,9 @@ func (f *fakeRepository) ResolvePermissionCodes(_ context.Context, tenantID, sub
 	f.resolvedTenant, f.resolvedSubject, f.resolvedSubjectType = tenantID, subjectID, subjectType
 	return f.codeGrants, f.policyVersion, nil
 }
+func (*fakeRepository) BootstrapTenantOwner(context.Context, sqlx.ExtContext, string, string, time.Time, string) error {
+	return nil
+}
 func (*fakeRepository) BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error) {
 	return 1, nil
 }

@@ -76,11 +76,15 @@ func (p *GroupProjection) Apply(ctx context.Context, envelope *commonv1.EventEnv
 }
 
 func (p *GroupProjection) markProcessed(ctx context.Context, tx *sqlx.Tx, eventID, eventType string, now time.Time) (bool, error) {
+	return markProcessedEvent(ctx, p.db, tx, eventID, eventType, now)
+}
+
+func markProcessedEvent(ctx context.Context, db *sqlx.DB, tx *sqlx.Tx, eventID, eventType string, now time.Time) (bool, error) {
 	query := "INSERT INTO authorization_processed_events (event_id, event_type, version, created_at, updated_at, created_by, updated_by) VALUES (?, ?, 1, ?, ?, 'event-consumer', 'event-consumer') ON CONFLICT (event_id) DO NOTHING"
-	if p.db.DriverName() == "mysql" {
+	if db.DriverName() == "mysql" {
 		query = "INSERT IGNORE INTO authorization_processed_events (event_id, event_type, version, created_at, updated_at, created_by, updated_by) VALUES (?, ?, 1, ?, ?, 'event-consumer', 'event-consumer')"
 	}
-	result, err := tx.ExecContext(ctx, p.db.Rebind(query), eventID, eventType, now, now)
+	result, err := tx.ExecContext(ctx, db.Rebind(query), eventID, eventType, now, now)
 	if err != nil {
 		return false, fmt.Errorf("record processed authorization event: %w", err)
 	}

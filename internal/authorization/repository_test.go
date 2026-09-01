@@ -3,6 +3,7 @@ package authorization
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
@@ -31,6 +32,41 @@ func TestSQLRepositoryResolveIncludesWildcardPermissions(t *testing.T) {
 	}
 	if len(grants) != 1 || grants[0].DataScope != "all" || version != 1 {
 		t.Fatalf("Resolve() = %+v, %d", grants, version)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLRepositoryBootstrapTenantOwnerCreatesReservedGrantGraph(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	now := time.Date(2026, time.September, 2, 12, 0, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	tenantID, membershipID, actor := "tenant-1", "membership-1", "user-1"
+	permissionID := tenantBootstrapID("permission", tenantID)
+	roleID := tenantBootstrapID("role", tenantID)
+
+	mock.ExpectExec("INSERT INTO permissions").
+		WithArgs(permissionID, tenantID, now, now, actor, actor).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO roles").
+		WithArgs(roleID, tenantID, now, now, actor, actor).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO role_permissions").
+		WithArgs(tenantBootstrapID("role-permission", tenantID), tenantID, roleID, permissionID, now, now, actor, actor).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO role_bindings").
+		WithArgs(tenantBootstrapID("binding:"+membershipID, tenantID), tenantID, membershipID, roleID, now, now, actor, actor).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repository.BootstrapTenantOwner(t.Context(), db, tenantID, membershipID, now, actor); err != nil {
+		t.Fatal(err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

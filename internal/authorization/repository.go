@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -35,6 +37,7 @@ type Repository interface {
 	ListBindings(context.Context, string, string, string, int, int) ([]Binding, int64, error)
 	Resolve(context.Context, string, string, string, string, string) ([]resolvedGrant, uint64, error)
 	ResolvePermissionCodes(context.Context, string, string, string, []string) ([]resolvedPermissionCodeGrant, uint64, error)
+	BootstrapTenantOwner(context.Context, sqlx.ExtContext, string, string, time.Time, string) error
 	BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error)
 	AddOutbox(context.Context, sqlx.ExtContext, OutboxEvent) error
 }
@@ -212,6 +215,43 @@ func (r *SQLRepository) ResolvePermissionCodes(ctx context.Context, tenantID, su
 	return grants, version, nil
 }
 
+func (r *SQLRepository) BootstrapTenantOwner(ctx context.Context, exec sqlx.ExtContext, tenantID, membershipID string, now time.Time, actor string) error {
+	permissionID := tenantBootstrapID("permission", tenantID)
+	roleID := tenantBootstrapID("role", tenantID)
+	rolePermissionID := tenantBootstrapID("role-permission", tenantID)
+	bindingID := tenantBootstrapID("binding:"+membershipID, tenantID)
+
+	permissionQuery := "INSERT INTO permissions (id, tenant_id, code, name, resource_type, action, status, version, created_at, updated_at, created_by, updated_by, condition_expression) VALUES (?, ?, 'tenant.owner-admin', 'Tenant owner administrator', '*', '*', 'active', 1, ?, ?, ?, ?, '') ON CONFLICT DO NOTHING"
+	roleQuery := "INSERT INTO roles (id, tenant_id, code, name, description, data_scope, status, version, created_at, updated_at, created_by, updated_by) VALUES (?, ?, 'tenant-owner-admin', 'Tenant owner administrator', 'Full access for the tenant owner', 'all', 'active', 1, ?, ?, ?, ?) ON CONFLICT DO NOTHING"
+	rolePermissionQuery := "INSERT INTO role_permissions (id, tenant_id, role_id, permission_id, status, version, created_at, updated_at, created_by, updated_by) VALUES (?, ?, ?, ?, 'active', 1, ?, ?, ?, ?) ON CONFLICT DO NOTHING"
+	bindingQuery := "INSERT INTO role_bindings (id, tenant_id, subject_id, subject_type, role_id, organization_unit_id, status, version, created_at, updated_at, created_by, updated_by) VALUES (?, ?, ?, 'membership', ?, NULL, 'active', 1, ?, ?, ?, ?) ON CONFLICT DO NOTHING"
+	if r.db.DriverName() == "mysql" {
+		permissionQuery = strings.Replace(permissionQuery, "INSERT INTO", "INSERT IGNORE INTO", 1)
+		permissionQuery = strings.TrimSuffix(permissionQuery, " ON CONFLICT DO NOTHING")
+		roleQuery = strings.Replace(roleQuery, "INSERT INTO", "INSERT IGNORE INTO", 1)
+		roleQuery = strings.TrimSuffix(roleQuery, " ON CONFLICT DO NOTHING")
+		rolePermissionQuery = strings.Replace(rolePermissionQuery, "INSERT INTO", "INSERT IGNORE INTO", 1)
+		rolePermissionQuery = strings.TrimSuffix(rolePermissionQuery, " ON CONFLICT DO NOTHING")
+		bindingQuery = strings.Replace(bindingQuery, "INSERT INTO", "INSERT IGNORE INTO", 1)
+		bindingQuery = strings.TrimSuffix(bindingQuery, " ON CONFLICT DO NOTHING")
+	}
+	for _, statement := range []struct {
+		name  string
+		query string
+		args  []any
+	}{
+		{name: "permission", query: permissionQuery, args: []any{permissionID, tenantID, now, now, actor, actor}},
+		{name: "role", query: roleQuery, args: []any{roleID, tenantID, now, now, actor, actor}},
+		{name: "role permission", query: rolePermissionQuery, args: []any{rolePermissionID, tenantID, roleID, permissionID, now, now, actor, actor}},
+		{name: "owner binding", query: bindingQuery, args: []any{bindingID, tenantID, membershipID, roleID, now, now, actor, actor}},
+	} {
+		if _, err := exec.ExecContext(ctx, r.db.Rebind(statement.query), statement.args...); err != nil {
+			return fmt.Errorf("bootstrap tenant owner %s: %w", statement.name, err)
+		}
+	}
+	return nil
+}
+
 func (r *SQLRepository) BumpPolicyVersion(ctx context.Context, exec sqlx.ExtContext, tenantID string, now time.Time, actor string) (uint64, error) {
 	if r.db.DriverName() == "mysql" {
 		_, err := exec.ExecContext(ctx, r.db.Rebind("INSERT INTO authorization_policy_versions (tenant_id, policy_version, version, created_at, updated_at, created_by, updated_by) VALUES (?, 1, 1, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE policy_version = policy_version + 1, version = version + 1, updated_at = VALUES(updated_at), updated_by = VALUES(updated_by)"), tenantID, now, now, actor, actor)
@@ -265,4 +305,8 @@ func nullableID(value string) any {
 		return nil
 	}
 	return value
+}
+
+func tenantBootstrapID(kind, tenantID string) string {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("authorization:tenant-bootstrap:"+kind+":"+tenantID)).String()
 }

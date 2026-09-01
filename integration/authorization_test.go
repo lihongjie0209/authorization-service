@@ -64,6 +64,25 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			if err != nil || !platformDecision.Allowed || platformDecision.DataScope != "all" {
 				t.Fatalf("platform Check() = (%+v, %v)", platformDecision, err)
 			}
+			tenantCreated, err := eventbus.NewEnvelope(eventbus.Metadata{EventID: uuid.NewString(), EventType: "platform.tenant.v1.TenantCreated", AggregateID: "tenant-owner", AggregateType: "tenant", TenantID: "tenant-owner", SchemaVersion: 1, ActorID: "owner-user", OccurredAt: time.Now().Truncate(time.Microsecond)}, &tenantv1.TenantCreatedEvent{Tenant: &tenantv1.Tenant{Id: "tenant-owner"}, OwnerMembershipId: "owner-membership", OwnerUserId: "owner-user"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tenantBootstrap := authorizationdomain.NewRuntimeTenantBootstrapProjection(db, appdb.NewTransactor(db), repository, service)
+			if err := tenantBootstrap.Apply(ctx, tenantCreated); err != nil {
+				t.Fatal(err)
+			}
+			if err := tenantBootstrap.Apply(ctx, tenantCreated); err != nil {
+				t.Fatalf("duplicate tenant bootstrap: %v", err)
+			}
+			ownerDecision, err := service.Check(ctx, "tenant-owner", "owner-membership", "membership", "any.resource", "any-action")
+			if err != nil || !ownerDecision.Allowed || ownerDecision.DataScope != "all" {
+				t.Fatalf("tenant owner Check() = (%+v, %v)", ownerDecision, err)
+			}
+			otherDecision, err := service.Check(ctx, "tenant-owner", "other-membership", "membership", "any.resource", "any-action")
+			if err != nil || otherDecision.Allowed {
+				t.Fatalf("unbound membership Check() = (%+v, %v)", otherDecision, err)
+			}
 			actorCtx := principal.WithContext(ctx, principal.Principal{ID: "admin-1", Type: principal.TypeServiceAccount})
 
 			permission, err := service.CreatePermission(actorCtx, "tenant-1", "invoice.read", "Read invoices", "invoice", "read")

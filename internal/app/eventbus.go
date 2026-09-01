@@ -16,17 +16,18 @@ import (
 )
 
 type eventRuntime struct {
-	config config.Config
-	store  *platformoutbox.SQLStore
-	groups *authorizationdomain.GroupProjection
-	logger *slog.Logger
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	bus    *eventbus.Bus
+	config  config.Config
+	store   *platformoutbox.SQLStore
+	groups  *authorizationdomain.GroupProjection
+	tenants *authorizationdomain.TenantBootstrapProjection
+	logger  *slog.Logger
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	bus     *eventbus.Bus
 }
 
-func newEventRuntime(lifecycle fx.Lifecycle, cfg config.Config, store *platformoutbox.SQLStore, groups *authorizationdomain.GroupProjection, logger *slog.Logger) *eventRuntime {
-	runtime := &eventRuntime{config: cfg, store: store, groups: groups, logger: logger}
+func newEventRuntime(lifecycle fx.Lifecycle, cfg config.Config, store *platformoutbox.SQLStore, groups *authorizationdomain.GroupProjection, tenants *authorizationdomain.TenantBootstrapProjection, logger *slog.Logger) *eventRuntime {
+	runtime := &eventRuntime{config: cfg, store: store, groups: groups, tenants: tenants, logger: logger}
 	lifecycle.Append(fx.Hook{OnStart: runtime.start, OnStop: runtime.stop})
 	return runtime
 }
@@ -61,6 +62,11 @@ func (r *eventRuntime) start(ctx context.Context) error {
 	r.wg.Go(func() {
 		if err := bus.Consume(runCtx, "authorization-tenant-groups-v1", "platform.tenant.group.changed.v1", r.groups.Apply); err != nil && !errors.Is(err, context.Canceled) {
 			r.logger.ErrorContext(runCtx, "consume tenant group events failed", "error", err)
+		}
+	})
+	r.wg.Go(func() {
+		if err := bus.Consume(runCtx, "authorization-tenant-bootstrap-v1", "platform.tenant.tenant.created.v1", r.tenants.Apply); err != nil && !errors.Is(err, context.Canceled) {
+			r.logger.ErrorContext(runCtx, "consume tenant created events failed", "error", err)
 		}
 	})
 	r.logger.Info("event bus started", "stream", r.config.EventBus.StreamName)
