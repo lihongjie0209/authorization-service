@@ -130,6 +130,38 @@ func TestEnforceInteractiveTenantBindsUsersAndAllowsTrustedServices(t *testing.T
 	}
 }
 
+func TestService_AuthorizeUserManagementScopeDerivesPlatformTarget(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{grants: []resolvedGrant{{DataScope: "all"}}, policyVersion: 3}
+	service := NewService(repository, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	authorizedCtx, targetTenantID, err := service.AuthorizeUserManagementScope(ctx, "tenant-1", "platform", "authorization.permission", "create")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if targetTenantID != platformauthz.PlatformTenantID || repository.resolvedTenant != platformauthz.PlatformTenantID || repository.resolvedSubject != "user-1" || repository.resolvedSubjectType != "user" {
+		t.Fatalf("target=%q resolved=(%q,%q,%q)", targetTenantID, repository.resolvedTenant, repository.resolvedSubject, repository.resolvedSubjectType)
+	}
+	if err := enforceInteractiveTenant(authorizedCtx, platformauthz.PlatformTenantID); err != nil {
+		t.Fatalf("authorized target marker: %v", err)
+	}
+	if err := enforceInteractiveTenant(authorizedCtx, "tenant-1"); err == nil {
+		t.Fatal("authorized target marker must not permit another scope")
+	}
+	if _, _, err := service.AuthorizeUserManagementScope(ctx, "tenant-2", "platform", "authorization.permission", "create"); err == nil {
+		t.Fatal("selected tenant mismatch must fail")
+	}
+}
+
+func TestService_AuthorizeUserManagementScopeDeniesWithoutGrant(t *testing.T) {
+	t.Parallel()
+	service := NewService(&fakeRepository{}, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	if _, _, err := service.AuthorizeUserManagementScope(ctx, "tenant-1", "tenant", "authorization.permission", "list"); err == nil {
+		t.Fatal("management scope without a grant must fail")
+	}
+}
+
 func TestService_UpdateRoleRejectsCrossTenantResourceID(t *testing.T) {
 	t.Parallel()
 	repository := &fakeRepository{role: &Role{ID: "role-2", TenantID: "tenant-2", Name: "Other role", DataScope: "tenant", Status: "active", AuditFields: AuditFields{Version: 1}}}

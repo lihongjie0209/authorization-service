@@ -29,6 +29,30 @@ type ListMyPermissionCatalogRequest struct {
 	Page            int    `json:"page"`
 	PageSize        int    `json:"page_size"`
 }
+type CreateMyPermissionRequest struct {
+	TenantID            string `json:"tenant_id" binding:"required"`
+	PermissionScope     string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Code                string `json:"code" binding:"required"`
+	Name                string `json:"name" binding:"required"`
+	ResourceType        string `json:"resource_type" binding:"required"`
+	Action              string `json:"action" binding:"required"`
+	ConditionExpression string `json:"condition_expression"`
+}
+type UpdateMyPermissionRequest struct {
+	TenantID            string `json:"tenant_id" binding:"required"`
+	PermissionScope     string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	PermissionID        string `json:"permission_id" binding:"required"`
+	Name                string `json:"name" binding:"required"`
+	ConditionExpression string `json:"condition_expression"`
+	Status              string `json:"status" binding:"required"`
+	Version             int64  `json:"version" binding:"required,gt=0"`
+}
+type ListMyPermissionsRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Page            int    `json:"page"`
+	PageSize        int    `json:"page_size"`
+}
 type UpdatePermissionRequest struct {
 	PermissionID        string `json:"permission_id" binding:"required"`
 	Name                string `json:"name" binding:"required"`
@@ -215,6 +239,96 @@ func (h *Handler) ListMyPermissionCatalog(c *gin.Context) {
 		return
 	}
 	value, err := h.authorization.ListPermissionCatalog(c.Request.Context(), tenantID, request.Search, request.Page, request.PageSize)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+func (h *Handler) authorizeUserPermissionManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
+	ctx, targetTenantID, err := h.authorization.AuthorizeUserManagementScope(c.Request.Context(), tenantID, scope, "authorization.permission", action)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return "", false
+	}
+	c.Request = c.Request.WithContext(ctx)
+	return targetTenantID, true
+}
+
+// CreateMyPermission godoc
+// @Summary Create a permission in the authenticated user's tenant or platform scope
+// @Tags authorization-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body CreateMyPermissionRequest true "Scoped permission"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-permissions/create [post]
+func (h *Handler) CreateMyPermission(c *gin.Context) {
+	var request CreateMyPermissionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserPermissionManagement(c, request.TenantID, request.PermissionScope, "create")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.CreatePermission(c.Request.Context(), tenantID, request.Code, request.Name, request.ResourceType, request.Action, request.ConditionExpression)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// UpdateMyPermission godoc
+// @Summary Update a permission in the authenticated user's tenant or platform scope
+// @Tags authorization-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body UpdateMyPermissionRequest true "Scoped permission update"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-permissions/update [post]
+func (h *Handler) UpdateMyPermission(c *gin.Context) {
+	var request UpdateMyPermissionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserPermissionManagement(c, request.TenantID, request.PermissionScope, "update"); !ok {
+		return
+	}
+	value, err := h.authorization.UpdatePermission(c.Request.Context(), request.PermissionID, request.Name, request.ConditionExpression, request.Status, request.Version)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, value)
+}
+
+// ListMyPermissions godoc
+// @Summary List permissions in the authenticated user's tenant or platform scope
+// @Tags authorization-permissions
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body ListMyPermissionsRequest true "Scoped permission pagination"
+// @Success 200 {object} Response
+// @Router /api/v1/authorization/my-permissions/list [post]
+func (h *Handler) ListMyPermissions(c *gin.Context) {
+	var request ListMyPermissionsRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserPermissionManagement(c, request.TenantID, request.PermissionScope, "list")
+	if !ok {
+		return
+	}
+	value, err := h.authorization.ListPermissions(c.Request.Context(), tenantID, request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return

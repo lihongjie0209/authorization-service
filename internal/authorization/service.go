@@ -45,12 +45,46 @@ type PermissionCodeDecision struct {
 	PolicyVersion uint64   `json:"policy_version"`
 }
 
+type authorizedManagementTenantKey struct{}
+
 func NewService(repository Repository, transactor *database.Transactor) *Service {
 	environment, _ := cel.NewEnv(cel.Variable("tenant_id", cel.StringType), cel.Variable("subject_id", cel.StringType), cel.Variable("resource_id", cel.StringType), cel.Variable("attributes", cel.MapType(cel.StringType, cel.StringType)))
 	return &Service{repository: repository, transactor: transactor, now: time.Now, cel: environment, cacheTTL: 30 * time.Second, cache: make(map[string]decisionCacheEntry)}
 }
 
+func (s *Service) AuthorizeUserManagementScope(ctx context.Context, selectedTenantID, scope, resource, action string) (context.Context, string, error) {
+	caller, ok := principal.FromContext(ctx)
+	selectedTenantID = strings.TrimSpace(selectedTenantID)
+	scope = strings.ToLower(strings.TrimSpace(scope))
+	if scope == "" {
+		scope = "tenant"
+	}
+	if !ok || caller.Type != principal.TypeUser || strings.TrimSpace(caller.MembershipID) == "" || strings.TrimSpace(caller.TenantID) != selectedTenantID {
+		return ctx, "", apperror.Forbidden("tenant-scoped user membership is required")
+	}
+	targetTenantID, subjectID, subjectType := selectedTenantID, caller.MembershipID, "membership"
+	if scope == "platform" {
+		targetTenantID, subjectID, subjectType = platformauthz.PlatformTenantID, caller.ID, "user"
+	} else if scope != "tenant" {
+		return ctx, "", apperror.Invalid("permission_scope must be tenant or platform", nil)
+	}
+	decision, err := s.CheckWithAttributes(ctx, targetTenantID, subjectID, subjectType, resource, "", action, nil)
+	if err != nil {
+		return ctx, "", err
+	}
+	if !decision.Allowed {
+		return ctx, "", apperror.Forbidden("management permission denied")
+	}
+	return context.WithValue(ctx, authorizedManagementTenantKey{}, targetTenantID), targetTenantID, nil
+}
+
 func enforceInteractiveTenant(ctx context.Context, targetTenantID string) error {
+	if authorizedTenantID, ok := ctx.Value(authorizedManagementTenantKey{}).(string); ok {
+		if strings.TrimSpace(targetTenantID) == authorizedTenantID {
+			return nil
+		}
+		return apperror.Forbidden("authorization resource belongs to another tenant scope")
+	}
 	caller, ok := principal.FromContext(ctx)
 	if !ok || strings.TrimSpace(caller.ID) == "" {
 		return apperror.Unauthorized("authenticated caller is required")

@@ -335,6 +335,120 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/authorization/my-permissions/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-permissions"
+                ],
+                "summary": "Create a permission in the authenticated user's tenant or platform scope",
+                "parameters": [
+                    {
+                        "description": "Scoped permission",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.CreateMyPermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/my-permissions/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-permissions"
+                ],
+                "summary": "List permissions in the authenticated user's tenant or platform scope",
+                "parameters": [
+                    {
+                        "description": "Scoped permission pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.ListMyPermissionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/my-permissions/update": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-permissions"
+                ],
+                "summary": "Update a permission in the authenticated user's tenant or platform scope",
+                "parameters": [
+                    {
+                        "description": "Scoped permission update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.UpdateMyPermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/permissions/create": {
             "post": {
                 "security": [
@@ -1057,6 +1171,44 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.CreateMyPermissionRequest": {
+            "type": "object",
+            "required": [
+                "action",
+                "code",
+                "name",
+                "permission_scope",
+                "resource_type",
+                "tenant_id"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "condition_expression": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "resource_type": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httptransport.CreatePermissionRequest": {
             "type": "object",
             "required": [
@@ -1184,6 +1336,31 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.ListMyPermissionsRequest": {
+            "type": "object",
+            "required": [
+                "permission_scope",
+                "tenant_id"
+            ],
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httptransport.ListPermissionsRequest": {
             "type": "object",
             "required": [
@@ -1275,6 +1452,44 @@ const docTemplate = `{
             ],
             "properties": {
                 "role_permission_id": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.UpdateMyPermissionRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "permission_id",
+                "permission_scope",
+                "status",
+                "tenant_id",
+                "version"
+            ],
+            "properties": {
+                "condition_expression": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission_id": {
+                    "type": "string"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {

@@ -151,6 +151,33 @@ definitions:
     - subject_type
     - tenant_id
     type: object
+  httptransport.CreateMyPermissionRequest:
+    properties:
+      action:
+        type: string
+      code:
+        type: string
+      condition_expression:
+        type: string
+      name:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      resource_type:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - action
+    - code
+    - name
+    - permission_scope
+    - resource_type
+    - tenant_id
+    type: object
   httptransport.CreatePermissionRequest:
     properties:
       action:
@@ -238,6 +265,23 @@ definitions:
     - permission_scope
     - tenant_id
     type: object
+  httptransport.ListMyPermissionsRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - tenant_id
+    type: object
   httptransport.ListPermissionsRequest:
     properties:
       page:
@@ -300,6 +344,33 @@ definitions:
         type: integer
     required:
     - role_permission_id
+    - version
+    type: object
+  httptransport.UpdateMyPermissionRequest:
+    properties:
+      condition_expression:
+        type: string
+      name:
+        type: string
+      permission_id:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      status:
+        type: string
+      tenant_id:
+        type: string
+      version:
+        type: integer
+    required:
+    - name
+    - permission_id
+    - permission_scope
+    - status
+    - tenant_id
     - version
     type: object
   httptransport.UpdatePermissionRequest:
@@ -535,6 +606,77 @@ paths:
       summary: Check up to 100 scoped permission codes for the authenticated user
       tags:
       - authorization-decisions
+  /api/v1/authorization/my-permissions/create:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped permission
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.CreateMyPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Create a permission in the authenticated user's tenant or platform
+        scope
+      tags:
+      - authorization-permissions
+  /api/v1/authorization/my-permissions/list:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped permission pagination
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.ListMyPermissionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: List permissions in the authenticated user's tenant or platform scope
+      tags:
+      - authorization-permissions
+  /api/v1/authorization/my-permissions/update:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped permission update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.UpdateMyPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httptransport.Response'
+      security:
+      - Bearer: []
+      summary: Update a permission in the authenticated user's tenant or platform
+        scope
+      tags:
+      - authorization-permissions
   /api/v1/authorization/permissions/create:
     post:
       consumes:
