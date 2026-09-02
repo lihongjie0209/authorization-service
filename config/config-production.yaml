@@ -32,6 +32,33 @@ rate_limit:
   enabled: true
 idempotency:
   enabled: true
+  http_paths:
+    - /api/v1/authorization/permissions/create
+    - /api/v1/authorization/permissions/update
+    - /api/v1/authorization/my-permissions/create
+    - /api/v1/authorization/my-permissions/update
+    - /api/v1/authorization/roles/create
+    - /api/v1/authorization/roles/update
+    - /api/v1/authorization/my-roles/create
+    - /api/v1/authorization/my-roles/update
+    - /api/v1/authorization/role-permissions/grant
+    - /api/v1/authorization/role-permissions/revoke
+    - /api/v1/authorization/my-role-permissions/grant
+    - /api/v1/authorization/my-role-permissions/revoke
+    - /api/v1/authorization/bindings/create
+    - /api/v1/authorization/bindings/revoke
+    - /api/v1/authorization/my-bindings/create
+    - /api/v1/authorization/my-bindings/revoke
+  grpc_methods:
+    - /platform.authorization.v1.AuthorizationService/CreatePermission
+    - /platform.authorization.v1.AuthorizationService/UpdatePermission
+    - /platform.authorization.v1.AuthorizationService/CreateRole
+    - /platform.authorization.v1.AuthorizationService/UpdateRole
+    - /platform.authorization.v1.AuthorizationService/GrantRolePermission
+    - /platform.authorization.v1.AuthorizationService/RevokeRolePermission
+    - /platform.authorization.v1.AuthorizationService/CreateBinding
+    - /platform.authorization.v1.AuthorizationService/RevokeBinding
+    - /platform.authorization.v1.AuthorizationService/InvalidateSubject
 observability:
   metrics_enabled: true
   tracing_enabled: false
