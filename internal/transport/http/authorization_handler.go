@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
-	authorization "github.com/lihongjie0209/authorization-service/internal/authorization"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
@@ -173,12 +172,6 @@ type ListMyBindingsRequest struct {
 	Page            int    `json:"page"`
 	PageSize        int    `json:"page_size"`
 }
-type BindingPageResponseBody struct {
-	Items    []authorization.Binding `json:"items"`
-	Total    int64                   `json:"total"`
-	Page     int                     `json:"page"`
-	PageSize int                     `json:"page_size"`
-}
 type CheckAuthorizationRequest struct {
 	TenantID     string            `json:"tenant_id" binding:"required"`
 	SubjectID    string            `json:"subject_id" binding:"required"`
@@ -204,7 +197,7 @@ type CheckMyPermissionCodesRequest struct {
 // @Produce json
 // @Security Bearer
 // @Param request body CreatePermissionRequest true "Permission"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionBody}
 // @Router /api/v1/authorization/permissions/create [post]
 func (h *Handler) CreatePermission(c *gin.Context) {
 	var request CreatePermissionRequest
@@ -217,7 +210,7 @@ func (h *Handler) CreatePermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionBody(value))
 }
 
 // UpdatePermission godoc
@@ -227,7 +220,7 @@ func (h *Handler) CreatePermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body UpdatePermissionRequest true "Permission update"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionBody}
 // @Router /api/v1/authorization/permissions/update [post]
 func (h *Handler) UpdatePermission(c *gin.Context) {
 	var request UpdatePermissionRequest
@@ -240,7 +233,7 @@ func (h *Handler) UpdatePermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionBody(value))
 }
 
 // ListPermissions godoc
@@ -250,7 +243,7 @@ func (h *Handler) UpdatePermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListPermissionsRequest true "Tenant and pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionPageBody}
 // @Router /api/v1/authorization/permissions/list [post]
 func (h *Handler) ListPermissions(c *gin.Context) {
 	var request ListPermissionsRequest
@@ -263,7 +256,7 @@ func (h *Handler) ListPermissions(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionPageBody(value))
 }
 
 // ListMyPermissionCatalog godoc
@@ -273,7 +266,7 @@ func (h *Handler) ListPermissions(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListMyPermissionCatalogRequest true "Selected tenant, permission scope, search and pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionPageBody}
 // @Failure 403 {object} Response "Permission catalog access denied"
 // @Router /api/v1/authorization/my-permission-catalog/list [post]
 func (h *Handler) ListMyPermissionCatalog(c *gin.Context) {
@@ -306,7 +299,7 @@ func (h *Handler) ListMyPermissionCatalog(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionPageBody(value))
 }
 
 func (h *Handler) authorizeUserPermissionManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
@@ -326,7 +319,7 @@ func (h *Handler) authorizeUserPermissionManagement(c *gin.Context, tenantID, sc
 // @Produce json
 // @Security Bearer
 // @Param request body CreateMyPermissionRequest true "Scoped permission"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionBody}
 // @Router /api/v1/authorization/my-permissions/create [post]
 func (h *Handler) CreateMyPermission(c *gin.Context) {
 	var request CreateMyPermissionRequest
@@ -343,7 +336,7 @@ func (h *Handler) CreateMyPermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionBody(value))
 }
 
 // UpdateMyPermission godoc
@@ -353,7 +346,7 @@ func (h *Handler) CreateMyPermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body UpdateMyPermissionRequest true "Scoped permission update"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionBody}
 // @Router /api/v1/authorization/my-permissions/update [post]
 func (h *Handler) UpdateMyPermission(c *gin.Context) {
 	var request UpdateMyPermissionRequest
@@ -369,7 +362,7 @@ func (h *Handler) UpdateMyPermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionBody(value))
 }
 
 // ListMyPermissions godoc
@@ -379,7 +372,7 @@ func (h *Handler) UpdateMyPermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListMyPermissionsRequest true "Scoped permission pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=PermissionPageBody}
 // @Router /api/v1/authorization/my-permissions/list [post]
 func (h *Handler) ListMyPermissions(c *gin.Context) {
 	var request ListMyPermissionsRequest
@@ -396,7 +389,7 @@ func (h *Handler) ListMyPermissions(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, permissionPageBody(value))
 }
 
 // CreateRole godoc
@@ -406,7 +399,7 @@ func (h *Handler) ListMyPermissions(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body CreateRoleRequest true "Role"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RoleBody}
 // @Router /api/v1/authorization/roles/create [post]
 func (h *Handler) CreateRole(c *gin.Context) {
 	var request CreateRoleRequest
@@ -419,7 +412,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, roleBody(value))
 }
 
 // UpdateRole godoc
@@ -429,7 +422,7 @@ func (h *Handler) CreateRole(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body UpdateRoleRequest true "Role and current version"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RoleBody}
 // @Router /api/v1/authorization/roles/update [post]
 func (h *Handler) UpdateRole(c *gin.Context) {
 	var request UpdateRoleRequest
@@ -442,7 +435,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, roleBody(value))
 }
 
 // ListRoles godoc
@@ -452,7 +445,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListRolesRequest true "Tenant and pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePageBody}
 // @Router /api/v1/authorization/roles/list [post]
 func (h *Handler) ListRoles(c *gin.Context) {
 	var request ListRolesRequest
@@ -465,7 +458,7 @@ func (h *Handler) ListRoles(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, rolePageBody(value))
 }
 
 func (h *Handler) authorizeUserRoleManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
@@ -485,7 +478,7 @@ func (h *Handler) authorizeUserRoleManagement(c *gin.Context, tenantID, scope, a
 // @Produce json
 // @Security Bearer
 // @Param request body CreateMyRoleRequest true "Scoped role"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RoleBody}
 // @Router /api/v1/authorization/my-roles/create [post]
 func (h *Handler) CreateMyRole(c *gin.Context) {
 	var request CreateMyRoleRequest
@@ -502,7 +495,7 @@ func (h *Handler) CreateMyRole(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, roleBody(value))
 }
 
 // UpdateMyRole godoc
@@ -512,7 +505,7 @@ func (h *Handler) CreateMyRole(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body UpdateMyRoleRequest true "Scoped role update"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RoleBody}
 // @Router /api/v1/authorization/my-roles/update [post]
 func (h *Handler) UpdateMyRole(c *gin.Context) {
 	var request UpdateMyRoleRequest
@@ -528,7 +521,7 @@ func (h *Handler) UpdateMyRole(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, roleBody(value))
 }
 
 // ListMyRoles godoc
@@ -538,7 +531,7 @@ func (h *Handler) UpdateMyRole(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListMyRolesRequest true "Scoped role pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePageBody}
 // @Router /api/v1/authorization/my-roles/list [post]
 func (h *Handler) ListMyRoles(c *gin.Context) {
 	var request ListMyRolesRequest
@@ -555,7 +548,7 @@ func (h *Handler) ListMyRoles(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, rolePageBody(value))
 }
 
 // GrantRolePermission godoc
@@ -565,7 +558,7 @@ func (h *Handler) ListMyRoles(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body GrantRolePermissionRequest true "Role permission"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePermissionBody}
 // @Router /api/v1/authorization/role-permissions/grant [post]
 func (h *Handler) GrantRolePermission(c *gin.Context) {
 	var request GrantRolePermissionRequest
@@ -578,7 +571,7 @@ func (h *Handler) GrantRolePermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, rolePermissionBody(value))
 }
 
 // RevokeRolePermission godoc
@@ -588,7 +581,7 @@ func (h *Handler) GrantRolePermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body RevokeRolePermissionRequest true "Role permission and current version"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePermissionBody}
 // @Router /api/v1/authorization/role-permissions/revoke [post]
 func (h *Handler) RevokeRolePermission(c *gin.Context) {
 	var request RevokeRolePermissionRequest
@@ -601,7 +594,7 @@ func (h *Handler) RevokeRolePermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, rolePermissionBody(value))
 }
 
 // ListRolePermissions godoc
@@ -611,7 +604,7 @@ func (h *Handler) RevokeRolePermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListRolePermissionsRequest true "Role"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePermissionsBody}
 // @Router /api/v1/authorization/role-permissions/list [post]
 func (h *Handler) ListRolePermissions(c *gin.Context) {
 	var request ListRolePermissionsRequest
@@ -624,7 +617,7 @@ func (h *Handler) ListRolePermissions(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, gin.H{"role_permissions": value})
+	OK(c, RolePermissionsBody{RolePermissions: rolePermissionBodies(value)})
 }
 
 func (h *Handler) authorizeUserRolePermissionManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
@@ -644,7 +637,7 @@ func (h *Handler) authorizeUserRolePermissionManagement(c *gin.Context, tenantID
 // @Produce json
 // @Security Bearer
 // @Param request body GrantMyRolePermissionRequest true "Scoped role permission"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePermissionBody}
 // @Router /api/v1/authorization/my-role-permissions/grant [post]
 func (h *Handler) GrantMyRolePermission(c *gin.Context) {
 	var request GrantMyRolePermissionRequest
@@ -661,7 +654,7 @@ func (h *Handler) GrantMyRolePermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, rolePermissionBody(value))
 }
 
 // RevokeMyRolePermission godoc
@@ -671,7 +664,7 @@ func (h *Handler) GrantMyRolePermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body RevokeMyRolePermissionRequest true "Scoped role permission revoke"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePermissionBody}
 // @Router /api/v1/authorization/my-role-permissions/revoke [post]
 func (h *Handler) RevokeMyRolePermission(c *gin.Context) {
 	var request RevokeMyRolePermissionRequest
@@ -687,7 +680,7 @@ func (h *Handler) RevokeMyRolePermission(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, rolePermissionBody(value))
 }
 
 // ListMyRolePermissions godoc
@@ -697,7 +690,7 @@ func (h *Handler) RevokeMyRolePermission(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListMyRolePermissionsRequest true "Scoped role"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=RolePermissionsBody}
 // @Router /api/v1/authorization/my-role-permissions/list [post]
 func (h *Handler) ListMyRolePermissions(c *gin.Context) {
 	var request ListMyRolePermissionsRequest
@@ -713,7 +706,7 @@ func (h *Handler) ListMyRolePermissions(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, gin.H{"role_permissions": value})
+	OK(c, RolePermissionsBody{RolePermissions: rolePermissionBodies(value)})
 }
 
 // CreateBinding godoc
@@ -723,7 +716,7 @@ func (h *Handler) ListMyRolePermissions(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body CreateBindingRequest true "Role binding"
-// @Success 200 {object} Response{body=authorization.Binding}
+// @Success 200 {object} Response{body=BindingBody}
 // @Router /api/v1/authorization/bindings/create [post]
 func (h *Handler) CreateBinding(c *gin.Context) {
 	var request CreateBindingRequest
@@ -736,7 +729,7 @@ func (h *Handler) CreateBinding(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, bindingBody(value))
 }
 
 // RevokeBinding godoc
@@ -746,7 +739,7 @@ func (h *Handler) CreateBinding(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body RevokeBindingRequest true "Binding and current version"
-// @Success 200 {object} Response{body=authorization.Binding}
+// @Success 200 {object} Response{body=BindingBody}
 // @Router /api/v1/authorization/bindings/revoke [post]
 func (h *Handler) RevokeBinding(c *gin.Context) {
 	var request RevokeBindingRequest
@@ -759,7 +752,7 @@ func (h *Handler) RevokeBinding(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, bindingBody(value))
 }
 
 // ListBindings godoc
@@ -782,7 +775,7 @@ func (h *Handler) ListBindings(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, BindingPageResponseBody{Items: value.Items, Total: value.Total, Page: value.Page, PageSize: value.PageSize})
+	OK(c, bindingPageBody(value))
 }
 
 func (h *Handler) authorizeUserBindingManagement(c *gin.Context, tenantID, scope, action string) (string, bool) {
@@ -802,7 +795,7 @@ func (h *Handler) authorizeUserBindingManagement(c *gin.Context, tenantID, scope
 // @Produce json
 // @Security Bearer
 // @Param request body CreateMyBindingRequest true "Scoped binding"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=BindingBody}
 // @Router /api/v1/authorization/my-bindings/create [post]
 func (h *Handler) CreateMyBinding(c *gin.Context) {
 	var request CreateMyBindingRequest
@@ -819,7 +812,7 @@ func (h *Handler) CreateMyBinding(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, bindingBody(value))
 }
 
 // RevokeMyBinding godoc
@@ -829,7 +822,7 @@ func (h *Handler) CreateMyBinding(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body RevokeMyBindingRequest true "Scoped binding revoke"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=BindingBody}
 // @Router /api/v1/authorization/my-bindings/revoke [post]
 func (h *Handler) RevokeMyBinding(c *gin.Context) {
 	var request RevokeMyBindingRequest
@@ -845,7 +838,7 @@ func (h *Handler) RevokeMyBinding(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, bindingBody(value))
 }
 
 // ListMyBindings godoc
@@ -855,7 +848,7 @@ func (h *Handler) RevokeMyBinding(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body ListMyBindingsRequest true "Scoped binding pagination"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=BindingPageResponseBody}
 // @Router /api/v1/authorization/my-bindings/list [post]
 func (h *Handler) ListMyBindings(c *gin.Context) {
 	var request ListMyBindingsRequest
@@ -872,7 +865,7 @@ func (h *Handler) ListMyBindings(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, BindingPageResponseBody{Items: value.Items, Total: value.Total, Page: value.Page, PageSize: value.PageSize})
+	OK(c, bindingPageBody(value))
 }
 
 // CheckAuthorization godoc
@@ -882,7 +875,7 @@ func (h *Handler) ListMyBindings(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body CheckAuthorizationRequest true "Authorization check"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=DecisionBody}
 // @Router /api/v1/authorization/check [post]
 func (h *Handler) CheckAuthorization(c *gin.Context) {
 	var request CheckAuthorizationRequest
@@ -899,7 +892,7 @@ func (h *Handler) CheckAuthorization(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, value)
+	OK(c, decisionBody(value))
 }
 
 // BatchCheckAuthorization godoc
@@ -909,7 +902,7 @@ func (h *Handler) CheckAuthorization(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body BatchCheckAuthorizationRequest true "Authorization checks"
-// @Success 200 {object} Response
+// @Success 200 {object} Response{body=DecisionsBody}
 // @Router /api/v1/authorization/batch-check [post]
 func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 	var request BatchCheckAuthorizationRequest
@@ -917,7 +910,7 @@ func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	decisions := make([]any, 0, len(request.Checks))
+	decisions := make([]DecisionBody, 0, len(request.Checks))
 	for _, check := range request.Checks {
 		if err := bindDecisionToCaller(c, &check); err != nil {
 			Fail(c, h.logger, err)
@@ -928,9 +921,9 @@ func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 			Fail(c, h.logger, err)
 			return
 		}
-		decisions = append(decisions, decision)
+		decisions = append(decisions, decisionBody(decision))
 	}
-	OK(c, gin.H{"decisions": decisions})
+	OK(c, DecisionsBody{Decisions: decisions})
 }
 
 // CheckMyPermissionCodes godoc
@@ -940,7 +933,7 @@ func (h *Handler) BatchCheckAuthorization(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param request body CheckMyPermissionCodesRequest true "Tenant and permission codes"
-// @Success 200 {object} Response{body=authorization.PermissionCodeDecision}
+// @Success 200 {object} Response{body=PermissionCodeDecisionBody}
 // @Router /api/v1/authorization/my-permissions/check [post]
 func (h *Handler) CheckMyPermissionCodes(c *gin.Context) {
 	var request CheckMyPermissionCodesRequest
@@ -963,7 +956,7 @@ func (h *Handler) CheckMyPermissionCodes(c *gin.Context) {
 		Fail(c, h.logger, err)
 		return
 	}
-	OK(c, decision)
+	OK(c, PermissionCodeDecisionBody{AllowedCodes: append([]string(nil), decision.AllowedCodes...), PolicyVersion: decision.PolicyVersion})
 }
 
 func currentPermissionSubject(caller principal.Principal, selectedTenantID, scope string) (string, string, string, error) {

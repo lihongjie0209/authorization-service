@@ -47,7 +47,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.DecisionsBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -93,7 +105,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "body": {
-                                            "$ref": "#/definitions/authorization.Binding"
+                                            "$ref": "#/definitions/httptransport.BindingBody"
                                         }
                                     }
                                 }
@@ -193,7 +205,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "body": {
-                                            "$ref": "#/definitions/authorization.Binding"
+                                            "$ref": "#/definitions/httptransport.BindingBody"
                                         }
                                     }
                                 }
@@ -235,7 +247,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.DecisionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -273,7 +297,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.BindingBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -311,7 +347,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.BindingPageResponseBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -349,7 +397,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.BindingBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -387,7 +447,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionPageBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "403": {
@@ -439,7 +511,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "body": {
-                                            "$ref": "#/definitions/authorization.PermissionCodeDecision"
+                                            "$ref": "#/definitions/httptransport.PermissionCodeDecisionBody"
                                         }
                                     }
                                 }
@@ -481,7 +553,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -519,7 +603,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionPageBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -557,7 +653,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -595,7 +703,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -633,7 +753,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionsBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -671,7 +803,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -709,7 +853,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RoleBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -747,7 +903,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePageBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -785,7 +953,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RoleBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -823,7 +1003,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -861,7 +1053,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionPageBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -899,7 +1103,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.PermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -937,7 +1153,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -975,7 +1203,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionsBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1013,7 +1253,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1051,7 +1303,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RoleBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1089,7 +1353,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePageBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1127,7 +1403,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/httptransport.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RoleBody"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1288,61 +1576,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "authorization.Binding": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "created_by": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "organization_unit_id": {
-                    "type": "string"
-                },
-                "role_id": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "subject_id": {
-                    "type": "string"
-                },
-                "subject_type": {
-                    "type": "string"
-                },
-                "tenant_id": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "updated_by": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "integer"
-                }
-            }
-        },
-        "authorization.PermissionCodeDecision": {
-            "type": "object",
-            "properties": {
-                "allowed_codes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "policy_version": {
-                    "type": "integer"
-                }
-            }
-        },
         "buildinfo.Info": {
             "type": "object",
             "properties": {
@@ -1404,13 +1637,54 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.BindingBody": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "organization_unit_id": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "subject_id": {
+                    "type": "string"
+                },
+                "subject_type": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "httptransport.BindingPageResponseBody": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/authorization.Binding"
+                        "$ref": "#/definitions/httptransport.BindingBody"
                     }
                 },
                 "page": {
@@ -1675,6 +1949,43 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.DecisionBody": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "data_scope": {
+                    "type": "string"
+                },
+                "decision_id": {
+                    "type": "string"
+                },
+                "organization_unit_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "policy_version": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.DecisionsBody": {
+            "type": "object",
+            "properties": {
+                "decisions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.DecisionBody"
+                    }
+                }
+            }
+        },
         "httptransport.GrantMyRolePermissionRequest": {
             "type": "object",
             "required": [
@@ -1930,6 +2241,84 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.PermissionBody": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "condition_expression": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "resource_type": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.PermissionCodeDecisionBody": {
+            "type": "object",
+            "properties": {
+                "allowed_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "policy_version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.PermissionPageBody": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.PermissionBody"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "httptransport.Response": {
             "type": "object",
             "properties": {
@@ -2026,6 +2415,113 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "httptransport.RoleBody": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "data_scope": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.RolePageBody": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.RoleBody"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.RolePermissionBody": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "permission_id": {
+                    "type": "string"
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httptransport.RolePermissionsBody": {
+            "type": "object",
+            "properties": {
+                "role_permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.RolePermissionBody"
+                    }
                 }
             }
         },

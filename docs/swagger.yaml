@@ -1,41 +1,5 @@
 basePath: /
 definitions:
-  authorization.Binding:
-    properties:
-      created_at:
-        type: string
-      created_by:
-        type: string
-      id:
-        type: string
-      organization_unit_id:
-        type: string
-      role_id:
-        type: string
-      status:
-        type: string
-      subject_id:
-        type: string
-      subject_type:
-        type: string
-      tenant_id:
-        type: string
-      updated_at:
-        type: string
-      updated_by:
-        type: string
-      version:
-        type: integer
-    type: object
-  authorization.PermissionCodeDecision:
-    properties:
-      allowed_codes:
-        items:
-          type: string
-        type: array
-      policy_version:
-        type: integer
-    type: object
   buildinfo.Info:
     properties:
       build_time:
@@ -76,11 +40,38 @@ definitions:
     required:
     - checks
     type: object
+  httptransport.BindingBody:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      organization_unit_id:
+        type: string
+      role_id:
+        type: string
+      status:
+        type: string
+      subject_id:
+        type: string
+      subject_type:
+        type: string
+      tenant_id:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
   httptransport.BindingPageResponseBody:
     properties:
       items:
         items:
-          $ref: '#/definitions/authorization.Binding'
+          $ref: '#/definitions/httptransport.BindingBody'
         type: array
       page:
         type: integer
@@ -265,6 +256,30 @@ definitions:
     - name
     - tenant_id
     type: object
+  httptransport.DecisionBody:
+    properties:
+      allowed:
+        type: boolean
+      data_scope:
+        type: string
+      decision_id:
+        type: string
+      organization_unit_ids:
+        items:
+          type: string
+        type: array
+      policy_version:
+        type: integer
+      reason:
+        type: string
+    type: object
+  httptransport.DecisionsBody:
+    properties:
+      decisions:
+        items:
+          $ref: '#/definitions/httptransport.DecisionBody'
+        type: array
+    type: object
   httptransport.GrantMyRolePermissionRequest:
     properties:
       permission_id:
@@ -437,6 +452,57 @@ definitions:
       subject:
         type: string
     type: object
+  httptransport.PermissionBody:
+    properties:
+      action:
+        type: string
+      code:
+        type: string
+      condition_expression:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      resource_type:
+        type: string
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  httptransport.PermissionCodeDecisionBody:
+    properties:
+      allowed_codes:
+        items:
+          type: string
+        type: array
+      policy_version:
+        type: integer
+    type: object
+  httptransport.PermissionPageBody:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.PermissionBody'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
   httptransport.Response:
     properties:
       body: {}
@@ -504,6 +570,76 @@ definitions:
     required:
     - role_permission_id
     - version
+    type: object
+  httptransport.RoleBody:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      data_scope:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  httptransport.RolePageBody:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.RoleBody'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  httptransport.RolePermissionBody:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      permission_id:
+        type: string
+      role_id:
+        type: string
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      version:
+        type: integer
+    type: object
+  httptransport.RolePermissionsBody:
+    properties:
+      role_permissions:
+        items:
+          $ref: '#/definitions/httptransport.RolePermissionBody'
+        type: array
     type: object
   httptransport.UpdateMyPermissionRequest:
     properties:
@@ -626,7 +762,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.DecisionsBody'
+              type: object
       security:
       - Bearer: []
       summary: Preview up to 100 authorization decisions
@@ -653,7 +794,7 @@ paths:
             - $ref: '#/definitions/httptransport.Response'
             - properties:
                 body:
-                  $ref: '#/definitions/authorization.Binding'
+                  $ref: '#/definitions/httptransport.BindingBody'
               type: object
       security:
       - Bearer: []
@@ -709,7 +850,7 @@ paths:
             - $ref: '#/definitions/httptransport.Response'
             - properties:
                 body:
-                  $ref: '#/definitions/authorization.Binding'
+                  $ref: '#/definitions/httptransport.BindingBody'
               type: object
       security:
       - Bearer: []
@@ -733,7 +874,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.DecisionBody'
+              type: object
       security:
       - Bearer: []
       summary: Preview an authorization decision
@@ -756,7 +902,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.BindingBody'
+              type: object
       security:
       - Bearer: []
       summary: Bind a role in the current tenant or platform scope
@@ -779,7 +930,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.BindingPageResponseBody'
+              type: object
       security:
       - Bearer: []
       summary: List bindings in the current tenant or platform scope
@@ -802,7 +958,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.BindingBody'
+              type: object
       security:
       - Bearer: []
       summary: Revoke a binding in the current tenant or platform scope
@@ -825,7 +986,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionPageBody'
+              type: object
         "403":
           description: Permission catalog access denied
           schema:
@@ -857,7 +1023,7 @@ paths:
             - $ref: '#/definitions/httptransport.Response'
             - properties:
                 body:
-                  $ref: '#/definitions/authorization.PermissionCodeDecision'
+                  $ref: '#/definitions/httptransport.PermissionCodeDecisionBody'
               type: object
       security:
       - Bearer: []
@@ -881,7 +1047,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Create a permission in the authenticated user's tenant or platform
@@ -905,7 +1076,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionPageBody'
+              type: object
       security:
       - Bearer: []
       summary: List permissions in the authenticated user's tenant or platform scope
@@ -928,7 +1104,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Update a permission in the authenticated user's tenant or platform
@@ -952,7 +1133,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Grant a permission to a role in the current tenant or platform scope
@@ -975,7 +1161,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionsBody'
+              type: object
       security:
       - Bearer: []
       summary: List role permissions in the current tenant or platform scope
@@ -998,7 +1189,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Revoke a role permission in the current tenant or platform scope
@@ -1021,7 +1217,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBody'
+              type: object
       security:
       - Bearer: []
       summary: Create a role in the authenticated user's tenant or platform scope
@@ -1044,7 +1245,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePageBody'
+              type: object
       security:
       - Bearer: []
       summary: List roles in the authenticated user's tenant or platform scope
@@ -1067,7 +1273,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBody'
+              type: object
       security:
       - Bearer: []
       summary: Update a role in the authenticated user's tenant or platform scope
@@ -1090,7 +1301,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Create a tenant permission
@@ -1113,7 +1329,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionPageBody'
+              type: object
       security:
       - Bearer: []
       summary: List tenant permissions
@@ -1136,7 +1357,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Update a tenant permission
@@ -1159,7 +1385,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Grant a permission to a role
@@ -1182,7 +1413,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionsBody'
+              type: object
       security:
       - Bearer: []
       summary: List permissions assigned to a role
@@ -1205,7 +1441,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionBody'
+              type: object
       security:
       - Bearer: []
       summary: Revoke a role permission with optimistic locking
@@ -1228,7 +1469,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBody'
+              type: object
       security:
       - Bearer: []
       summary: Create a tenant role
@@ -1251,7 +1497,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePageBody'
+              type: object
       security:
       - Bearer: []
       summary: List tenant roles
@@ -1274,7 +1525,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/httptransport.Response'
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBody'
+              type: object
       security:
       - Bearer: []
       summary: Update a role with optimistic locking
