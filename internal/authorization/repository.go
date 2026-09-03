@@ -34,6 +34,7 @@ type Repository interface {
 	GetRolePermissionByPair(context.Context, string, string) (RolePermission, error)
 	UpdateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error
 	ListRolePermissions(context.Context, string) ([]RolePermission, error)
+	BatchGetRolePermissions(context.Context, string, []string) ([]RolePermission, error)
 	CreateBinding(context.Context, sqlx.ExtContext, Binding) error
 	GetBinding(context.Context, string) (Binding, error)
 	UpdateBinding(context.Context, sqlx.ExtContext, Binding) error
@@ -198,6 +199,18 @@ func (r *SQLRepository) ListRolePermissions(ctx context.Context, roleID string) 
 	items := make([]RolePermission, 0)
 	err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? ORDER BY created_at, id"), roleID)
 	return items, wrap(err, "list role permissions")
+}
+
+func (r *SQLRepository) BatchGetRolePermissions(ctx context.Context, roleID string, permissionIDs []string) ([]RolePermission, error) {
+	query, args, err := sqlx.In("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND permission_id IN (?) ORDER BY id", roleID, permissionIDs)
+	if err != nil {
+		return nil, fmt.Errorf("build batch role permission query: %w", err)
+	}
+	items := make([]RolePermission, 0, len(permissionIDs))
+	if err := r.db.SelectContext(ctx, &items, r.db.Rebind(query), args...); err != nil {
+		return nil, fmt.Errorf("batch get role permissions: %w", err)
+	}
+	return items, nil
 }
 
 func (r *SQLRepository) CreateBinding(ctx context.Context, exec sqlx.ExtContext, value Binding) error {

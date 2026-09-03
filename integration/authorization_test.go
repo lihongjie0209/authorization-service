@@ -105,6 +105,10 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			rolePermissionBatch, err := service.BatchGetRolePermissions(actorCtx, role.ID, []string{permission.ID, uuid.NewString()})
+			if err != nil || len(rolePermissionBatch) != 1 || rolePermissionBatch[0].ID != rolePermission.ID {
+				t.Fatalf("BatchGetRolePermissions() = (%+v, %v)", rolePermissionBatch, err)
+			}
 			binding, err := service.CreateBinding(actorCtx, "tenant-1", "group-1", "group", role.ID, "org-1")
 			if err != nil {
 				t.Fatal(err)

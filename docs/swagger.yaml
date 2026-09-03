@@ -40,6 +40,27 @@ definitions:
     required:
     - checks
     type: object
+  httptransport.BatchGetMyRolePermissionsRequest:
+    properties:
+      permission_ids:
+        items:
+          type: string
+        type: array
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_id:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_ids
+    - permission_scope
+    - role_id
+    - tenant_id
+    type: object
   httptransport.BatchGetMyRolesRequest:
     properties:
       permission_scope:
@@ -1145,6 +1166,34 @@ paths:
         scope
       tags:
       - authorization-permissions
+  /api/v1/authorization/my-role-permissions/batch-get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role and permission IDs (maximum 100)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.BatchGetMyRolePermissionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RolePermissionsBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get role-permission state for a bounded permission set
+      tags:
+      - authorization-roles
   /api/v1/authorization/my-role-permissions/grant:
     post:
       consumes:

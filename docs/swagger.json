@@ -668,6 +668,56 @@
                 }
             }
         },
+        "/api/v1/authorization/my-role-permissions/batch-get": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Get role-permission state for a bounded permission set",
+                "parameters": [
+                    {
+                        "description": "Scoped role and permission IDs (maximum 100)",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.BatchGetMyRolePermissionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RolePermissionsBody"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/my-role-permissions/grant": {
             "post": {
                 "security": [
@@ -1681,6 +1731,36 @@
                     "items": {
                         "$ref": "#/definitions/httptransport.CheckAuthorizationRequest"
                     }
+                }
+            }
+        },
+        "httptransport.BatchGetMyRolePermissionsRequest": {
+            "type": "object",
+            "required": [
+                "permission_ids",
+                "permission_scope",
+                "role_id",
+                "tenant_id"
+            ],
+            "properties": {
+                "permission_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
                 }
             }
         },

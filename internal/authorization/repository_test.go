@@ -102,6 +102,30 @@ func TestSQLRepositorySearchAndBatchRolesRemainTenantScoped(t *testing.T) {
 	}
 }
 
+func TestSQLRepositoryBatchGetRolePermissionsFiltersRoleAndPermissions(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	query := db.Rebind("SELECT " + rolePermissionColumns + " FROM role_permissions WHERE role_id = ? AND permission_id IN (?, ?) ORDER BY id")
+	now := time.Now()
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WithArgs("role-1", "permission-1", "permission-2").
+		WillReturnRows(sqlmock.NewRows(strings.Split(rolePermissionColumns, ", ")).
+			AddRow("assignment-1", "tenant-1", "role-1", "permission-1", "active", 1, now, now, "user-1", "user-1"))
+	items, err := repository.BatchGetRolePermissions(t.Context(), "role-1", []string{"permission-1", "permission-2"})
+	if err != nil || len(items) != 1 || items[0].PermissionID != "permission-1" {
+		t.Fatalf("BatchGetRolePermissions() = (%+v, %v)", items, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSQLRepositoryBootstrapTenantOwnerCreatesReservedGrantGraph(t *testing.T) {
 	t.Parallel()
 	database, mock, err := sqlmock.New()

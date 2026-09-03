@@ -368,6 +368,41 @@ func (s *Service) ListRolePermissions(ctx context.Context, roleID string) ([]Rol
 	return values, translate(err)
 }
 
+func (s *Service) BatchGetRolePermissions(ctx context.Context, roleID string, permissionIDs []string) ([]RolePermission, error) {
+	roleID = strings.TrimSpace(roleID)
+	if roleID == "" {
+		return nil, apperror.Invalid("role_id is required", nil)
+	}
+	role, err := s.repository.GetRole(ctx, roleID)
+	if err != nil {
+		return nil, translate(err)
+	}
+	if err := enforceInteractiveTenant(ctx, role.TenantID); err != nil {
+		return nil, err
+	}
+	unique := make([]string, 0, len(permissionIDs))
+	seen := make(map[string]struct{}, len(permissionIDs))
+	for _, id := range permissionIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return nil, apperror.Invalid("permission_ids must not contain empty values", nil)
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return []RolePermission{}, nil
+	}
+	if len(unique) > 100 {
+		return nil, apperror.Invalid("permission_ids must not contain more than 100 values", nil)
+	}
+	items, err := s.repository.BatchGetRolePermissions(ctx, roleID, unique)
+	return items, translate(err)
+}
+
 func (s *Service) CreateBinding(ctx context.Context, tenantID, subjectID, subjectType, roleID, organizationUnitID string) (Binding, error) {
 	role, err := s.repository.GetRole(ctx, roleID)
 	if err != nil {

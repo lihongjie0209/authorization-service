@@ -139,6 +139,12 @@ type ListMyRolePermissionsRequest struct {
 	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
 	RoleID          string `json:"role_id" binding:"required"`
 }
+type BatchGetMyRolePermissionsRequest struct {
+	TenantID        string   `json:"tenant_id" binding:"required"`
+	PermissionScope string   `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	RoleID          string   `json:"role_id" binding:"required"`
+	PermissionIDs   []string `json:"permission_ids" binding:"required"`
+}
 type CreateBindingRequest struct {
 	TenantID           string `json:"tenant_id" binding:"required"`
 	SubjectID          string `json:"subject_id" binding:"required"`
@@ -741,6 +747,32 @@ func (h *Handler) ListMyRolePermissions(c *gin.Context) {
 		return
 	}
 	OK(c, RolePermissionsBody{RolePermissions: rolePermissionBodies(value)})
+}
+
+// BatchGetMyRolePermissions godoc
+// @Summary Get role-permission state for a bounded permission set
+// @Tags authorization-roles
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body BatchGetMyRolePermissionsRequest true "Scoped role and permission IDs (maximum 100)"
+// @Success 200 {object} Response{body=RolePermissionsBody}
+// @Router /api/v1/authorization/my-role-permissions/batch-get [post]
+func (h *Handler) BatchGetMyRolePermissions(c *gin.Context) {
+	var request BatchGetMyRolePermissionsRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "list"); !ok {
+		return
+	}
+	items, err := h.authorization.BatchGetRolePermissions(c.Request.Context(), request.RoleID, request.PermissionIDs)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, RolePermissionsBody{RolePermissions: rolePermissionBodies(items)})
 }
 
 // CreateBinding godoc

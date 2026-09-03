@@ -83,6 +83,7 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 	api.POST("/authorization/my-role-permissions/grant", handler.GrantMyRolePermission)
 	api.POST("/authorization/my-role-permissions/revoke", handler.RevokeMyRolePermission)
 	api.POST("/authorization/my-role-permissions/list", handler.ListMyRolePermissions)
+	api.POST("/authorization/my-role-permissions/batch-get", handler.BatchGetMyRolePermissions)
 	api.POST("/authorization/bindings/create", handler.CreateBinding)
 	api.POST("/authorization/bindings/revoke", handler.RevokeBinding)
 	api.POST("/authorization/bindings/list", handler.ListBindings)

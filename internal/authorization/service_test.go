@@ -92,6 +92,9 @@ func (*fakeRepository) UpdateRolePermission(context.Context, sqlx.ExtContext, Ro
 func (*fakeRepository) ListRolePermissions(context.Context, string) ([]RolePermission, error) {
 	return nil, nil
 }
+func (*fakeRepository) BatchGetRolePermissions(context.Context, string, []string) ([]RolePermission, error) {
+	return nil, nil
+}
 func (*fakeRepository) CreateBinding(context.Context, sqlx.ExtContext, Binding) error { return nil }
 func (*fakeRepository) GetBinding(context.Context, string) (Binding, error) {
 	return Binding{}, ErrNotFound
@@ -235,6 +238,24 @@ func TestService_SearchAndBatchGetRolesAreTenantScopedAndBounded(t *testing.T) {
 	}
 	if _, err := service.BatchGetRoles(ctx, "tenant-1", tooMany); err == nil {
 		t.Fatal("oversized role batch must fail")
+	}
+}
+
+func TestService_BatchGetRolePermissionsValidatesBoundedIDs(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{role: &Role{ID: "role-1", TenantID: "tenant-1"}}
+	service := NewService(repository, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	items, err := service.BatchGetRolePermissions(ctx, "role-1", nil)
+	if err != nil || len(items) != 0 {
+		t.Fatalf("empty BatchGetRolePermissions() = (%+v, %v)", items, err)
+	}
+	tooMany := make([]string, 101)
+	for index := range tooMany {
+		tooMany[index] = fmt.Sprintf("permission-%d", index)
+	}
+	if _, err := service.BatchGetRolePermissions(ctx, "role-1", tooMany); err == nil {
+		t.Fatal("oversized permission batch must fail")
 	}
 }
 
