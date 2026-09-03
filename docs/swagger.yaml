@@ -342,6 +342,52 @@ definitions:
     - permission_scope
     - tenant_id
     type: object
+  httptransport.GetMyPermissionRequest:
+    properties:
+      permission_id:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_id
+    - permission_scope
+    - tenant_id
+    type: object
+  httptransport.GetMyRoleRequest:
+    properties:
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_id:
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - role_id
+    - tenant_id
+    type: object
+  httptransport.GetPermissionRequest:
+    properties:
+      permission_id:
+        type: string
+    required:
+    - permission_id
+    type: object
+  httptransport.GetRoleRequest:
+    properties:
+      role_id:
+        type: string
+    required:
+    - role_id
+    type: object
   httptransport.GrantMyRolePermissionRequest:
     properties:
       permission_id:
@@ -1188,6 +1234,34 @@ paths:
         scope
       tags:
       - authorization-permissions
+  /api/v1/authorization/my-permissions/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped permission ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetMyPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a permission in the current management scope
+      tags:
+      - authorization-permissions
   /api/v1/authorization/my-permissions/list:
     post:
       consumes:
@@ -1413,6 +1487,34 @@ paths:
       summary: Create a role in the authenticated user's tenant or platform scope
       tags:
       - authorization-roles
+  /api/v1/authorization/my-roles/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetMyRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a role in the current management scope
+      tags:
+      - authorization-roles
   /api/v1/authorization/my-roles/list:
     post:
       consumes:
@@ -1495,6 +1597,34 @@ paths:
       security:
       - Bearer: []
       summary: Create a tenant permission
+      tags:
+      - authorization-permissions
+  /api/v1/authorization/permissions/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Permission ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.PermissionBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a permission by ID
       tags:
       - authorization-permissions
   /api/v1/authorization/permissions/list:
@@ -1663,6 +1793,34 @@ paths:
       security:
       - Bearer: []
       summary: Create a tenant role
+      tags:
+      - authorization-roles
+  /api/v1/authorization/roles/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Role ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a role by ID
       tags:
       - authorization-roles
   /api/v1/authorization/roles/list:

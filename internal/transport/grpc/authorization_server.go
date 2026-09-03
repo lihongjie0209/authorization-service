@@ -57,6 +57,13 @@ func (s *authorizationServer) CreatePermission(ctx context.Context, request *aut
 	}
 	return &authorizationv1.CreatePermissionResponse{Permission: toProtoPermission(value)}, nil
 }
+func (s *authorizationServer) GetPermission(ctx context.Context, request *authorizationv1.GetPermissionRequest) (*authorizationv1.GetPermissionResponse, error) {
+	value, err := s.service.GetPermission(ctx, request.GetPermissionId())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &authorizationv1.GetPermissionResponse{Permission: toProtoPermission(value)}, nil
+}
 func (s *authorizationServer) UpdatePermission(ctx context.Context, request *authorizationv1.UpdatePermissionRequest) (*authorizationv1.UpdatePermissionResponse, error) {
 	value, err := s.service.UpdatePermission(ctx, request.GetPermissionId(), request.GetName(), request.GetConditionExpression(), request.GetStatus(), request.GetExpectedVersion())
 	if err != nil {
@@ -82,6 +89,13 @@ func (s *authorizationServer) CreateRole(ctx context.Context, request *authoriza
 		return nil, grpcError(err)
 	}
 	return &authorizationv1.CreateRoleResponse{Role: toProtoRole(value)}, nil
+}
+func (s *authorizationServer) GetRole(ctx context.Context, request *authorizationv1.GetRoleRequest) (*authorizationv1.GetRoleResponse, error) {
+	value, err := s.service.GetRole(ctx, request.GetRoleId())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &authorizationv1.GetRoleResponse{Role: toProtoRole(value)}, nil
 }
 func (s *authorizationServer) UpdateRole(ctx context.Context, request *authorizationv1.UpdateRoleRequest) (*authorizationv1.UpdateRoleResponse, error) {
 	value, err := s.service.UpdateRole(ctx, request.GetRoleId(), request.GetName(), request.GetDescription(), request.GetDataScope(), request.GetStatus(), request.GetExpectedVersion())

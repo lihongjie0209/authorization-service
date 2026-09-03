@@ -66,6 +66,8 @@ func Authorization(enabled bool, authorizer platformauthz.Authorizer, logger *sl
 
 func authorizationHTTPRequirement(route string) (platformauthz.Requirement, bool) {
 	requirements := map[string]platformauthz.Requirement{
+		"/api/v1/authorization/permissions/get":         {Resource: "authorization.permission", Action: "read", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/roles/get":               {Resource: "authorization.role", Action: "read", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/permissions/create":      {Resource: "authorization.permission", Action: "create", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/permissions/update":      {Resource: "authorization.permission", Action: "update", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/permissions/list":        {Resource: "authorization.permission", Action: "list", Scope: platformauthz.ScopePrincipal},

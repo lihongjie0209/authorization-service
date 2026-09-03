@@ -193,6 +193,20 @@ func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpre
 	}
 	return s.repository.GetPermission(ctx, id)
 }
+func (s *Service) GetPermission(ctx context.Context, id string) (Permission, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Permission{}, apperror.Invalid("permission_id is required", nil)
+	}
+	value, err := s.repository.GetPermission(ctx, id)
+	if err != nil {
+		return Permission{}, translate(err)
+	}
+	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
+		return Permission{}, err
+	}
+	return value, nil
+}
 
 func (s *Service) CreateRole(ctx context.Context, tenantID, code, name, description, dataScope string) (Role, error) {
 	tenantID, code, name = strings.TrimSpace(tenantID), strings.ToLower(strings.TrimSpace(code)), strings.TrimSpace(name)
@@ -236,6 +250,20 @@ func (s *Service) UpdateRole(ctx context.Context, id, name, description, dataSco
 		return Role{}, err
 	}
 	return s.repository.GetRole(ctx, id)
+}
+func (s *Service) GetRole(ctx context.Context, id string) (Role, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Role{}, apperror.Invalid("role_id is required", nil)
+	}
+	value, err := s.repository.GetRole(ctx, id)
+	if err != nil {
+		return Role{}, translate(err)
+	}
+	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
+		return Role{}, err
+	}
+	return value, nil
 }
 
 func (s *Service) ListRoles(ctx context.Context, tenantID string, page, pageSize int) (Page[Role], error) {
