@@ -93,6 +93,14 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			rolePage, err := service.SearchRoles(actorCtx, "tenant-1", "audit", "active", 1, 20)
+			if err != nil || rolePage.Total != 1 || len(rolePage.Items) != 1 || rolePage.Items[0].ID != role.ID {
+				t.Fatalf("SearchRoles() = (%+v, %v)", rolePage, err)
+			}
+			roleBatch, err := service.BatchGetRoles(actorCtx, "tenant-1", []string{role.ID, uuid.NewString()})
+			if err != nil || len(roleBatch) != 1 || roleBatch[0].ID != role.ID {
+				t.Fatalf("BatchGetRoles() = (%+v, %v)", roleBatch, err)
+			}
 			rolePermission, err := service.GrantRolePermission(actorCtx, "tenant-1", role.ID, permission.ID)
 			if err != nil {
 				t.Fatal(err)

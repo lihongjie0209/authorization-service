@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,13 @@ type fakeRepository struct {
 	catalogTenant       string
 	catalogSearch       string
 	role                *Role
+	roleSearchTenant    string
+	roleSearchKeyword   string
+	roleSearchStatus    string
+	roleSearchLimit     int
+	roleSearchOffset    int
+	roleBatchTenant     string
+	roleBatchIDs        []string
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
@@ -51,6 +59,20 @@ func (f *fakeRepository) GetRole(context.Context, string) (Role, error) {
 func (*fakeRepository) UpdateRole(context.Context, sqlx.ExtContext, Role) error { return nil }
 func (*fakeRepository) ListRoles(context.Context, string, int, int) ([]Role, int64, error) {
 	return nil, 0, nil
+}
+func (f *fakeRepository) SearchRoles(_ context.Context, tenantID, keyword, status string, limit, offset int) ([]Role, int64, error) {
+	f.roleSearchTenant, f.roleSearchKeyword, f.roleSearchStatus, f.roleSearchLimit, f.roleSearchOffset = tenantID, keyword, status, limit, offset
+	if f.role == nil {
+		return nil, 0, nil
+	}
+	return []Role{*f.role}, 1, nil
+}
+func (f *fakeRepository) BatchGetRoles(_ context.Context, tenantID string, ids []string) ([]Role, error) {
+	f.roleBatchTenant, f.roleBatchIDs = tenantID, append([]string(nil), ids...)
+	if f.role == nil {
+		return nil, nil
+	}
+	return []Role{*f.role}, nil
 }
 func (*fakeRepository) GetPermission(context.Context, string) (Permission, error) {
 	return Permission{}, ErrNotFound
@@ -185,6 +207,34 @@ func TestService_ListPermissionCatalogUsesBoundedSearch(t *testing.T) {
 	}
 	if _, err := service.ListPermissionCatalog(t.Context(), "tenant-1", strings.Repeat("x", 101), 1, 20); err == nil {
 		t.Fatal("oversized search must fail")
+	}
+}
+
+func TestService_SearchAndBatchGetRolesAreTenantScopedAndBounded(t *testing.T) {
+	t.Parallel()
+	repository := &fakeRepository{role: &Role{ID: "role-1", TenantID: "tenant-1", Code: "operator"}}
+	service := NewService(repository, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	page, err := service.SearchRoles(ctx, " tenant-1 ", " operator ", "active", 2, 25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || repository.roleSearchTenant != "tenant-1" || repository.roleSearchKeyword != "operator" || repository.roleSearchLimit != 25 || repository.roleSearchOffset != 25 {
+		t.Fatalf("SearchRoles() page=%+v repository=%+v", page, repository)
+	}
+	if _, err := service.SearchRoles(ctx, "tenant-1", strings.Repeat("x", 101), "", 1, 20); err == nil {
+		t.Fatal("oversized role keyword must fail")
+	}
+	items, err := service.BatchGetRoles(ctx, "tenant-1", []string{" role-1 ", "role-1"})
+	if err != nil || len(items) != 1 || len(repository.roleBatchIDs) != 1 || repository.roleBatchIDs[0] != "role-1" {
+		t.Fatalf("BatchGetRoles() items=%+v ids=%v err=%v", items, repository.roleBatchIDs, err)
+	}
+	tooMany := make([]string, 101)
+	for index := range tooMany {
+		tooMany[index] = fmt.Sprintf("role-%d", index)
+	}
+	if _, err := service.BatchGetRoles(ctx, "tenant-1", tooMany); err == nil {
+		t.Fatal("oversized role batch must fail")
 	}
 }
 

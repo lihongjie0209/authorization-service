@@ -821,6 +821,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/authorization/my-roles/batch-get": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-roles"
+                ],
+                "summary": "Get a bounded set of roles in the authenticated user's management scope",
+                "parameters": [
+                    {
+                        "description": "Scoped role IDs (maximum 100)",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.BatchGetMyRolesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.RoleBatchBody"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/my-roles/create": {
             "post": {
                 "security": [
@@ -1637,6 +1687,32 @@ const docTemplate = `{
                 }
             }
         },
+        "httptransport.BatchGetMyRolesRequest": {
+            "type": "object",
+            "required": [
+                "permission_scope",
+                "role_ids",
+                "tenant_id"
+            ],
+            "properties": {
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tenant_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httptransport.BindingBody": {
             "type": "object",
             "properties": {
@@ -2170,6 +2246,9 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "keyword": {
+                    "type": "string"
+                },
                 "page": {
                     "type": "integer"
                 },
@@ -2182,6 +2261,9 @@ const docTemplate = `{
                         "tenant",
                         "platform"
                     ]
+                },
+                "status": {
+                    "type": "string"
                 },
                 "tenant_id": {
                     "type": "string"
@@ -2415,6 +2497,17 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "httptransport.RoleBatchBody": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httptransport.RoleBody"
+                    }
                 }
             }
         },

@@ -100,8 +100,15 @@ type UpdateMyRoleRequest struct {
 type ListMyRolesRequest struct {
 	TenantID        string `json:"tenant_id" binding:"required"`
 	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Keyword         string `json:"keyword"`
+	Status          string `json:"status"`
 	Page            int    `json:"page"`
 	PageSize        int    `json:"page_size"`
+}
+type BatchGetMyRolesRequest struct {
+	TenantID        string   `json:"tenant_id" binding:"required"`
+	PermissionScope string   `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	RoleIDs         []string `json:"role_ids" binding:"required"`
 }
 type GrantRolePermissionRequest struct {
 	TenantID     string `json:"tenant_id" binding:"required"`
@@ -543,12 +550,39 @@ func (h *Handler) ListMyRoles(c *gin.Context) {
 	if !ok {
 		return
 	}
-	value, err := h.authorization.ListRoles(c.Request.Context(), tenantID, request.Page, request.PageSize)
+	value, err := h.authorization.SearchRoles(c.Request.Context(), tenantID, request.Keyword, request.Status, request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
 	}
 	OK(c, rolePageBody(value))
+}
+
+// BatchGetMyRoles godoc
+// @Summary Get a bounded set of roles in the authenticated user's management scope
+// @Tags authorization-roles
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body BatchGetMyRolesRequest true "Scoped role IDs (maximum 100)"
+// @Success 200 {object} Response{body=RoleBatchBody}
+// @Router /api/v1/authorization/my-roles/batch-get [post]
+func (h *Handler) BatchGetMyRoles(c *gin.Context) {
+	var request BatchGetMyRolesRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	tenantID, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "list")
+	if !ok {
+		return
+	}
+	items, err := h.authorization.BatchGetRoles(c.Request.Context(), tenantID, request.RoleIDs)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, roleBatchBody(items))
 }
 
 // GrantRolePermission godoc

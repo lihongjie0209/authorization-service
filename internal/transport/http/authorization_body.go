@@ -93,6 +93,10 @@ type RolePageBody struct {
 	PageSize int        `json:"page_size"`
 }
 
+type RoleBatchBody struct {
+	Items []RoleBody `json:"items"`
+}
+
 type BindingPageResponseBody struct {
 	Items    []BindingBody `json:"items"`
 	Total    int64         `json:"total"`
@@ -188,6 +192,14 @@ func permissionPageBody(value authorization.Page[authorization.Permission]) Perm
 
 func rolePageBody(value authorization.Page[authorization.Role]) RolePageBody {
 	return RolePageBody{Items: roleBodies(value.Items), Total: value.Total, Page: value.Page, PageSize: value.PageSize}
+}
+
+func roleBatchBody(values []authorization.Role) RoleBatchBody {
+	items := make([]RoleBody, len(values))
+	for index := range values {
+		items[index] = roleBody(values[index])
+	}
+	return RoleBatchBody{Items: items}
 }
 
 func bindingPageBody(value authorization.Page[authorization.Binding]) BindingPageResponseBody {

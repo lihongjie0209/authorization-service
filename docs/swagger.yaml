@@ -40,6 +40,24 @@ definitions:
     required:
     - checks
     type: object
+  httptransport.BatchGetMyRolesRequest:
+    properties:
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      role_ids:
+        items:
+          type: string
+        type: array
+      tenant_id:
+        type: string
+    required:
+    - permission_scope
+    - role_ids
+    - tenant_id
+    type: object
   httptransport.BindingBody:
     properties:
       created_at:
@@ -403,6 +421,8 @@ definitions:
     type: object
   httptransport.ListMyRolesRequest:
     properties:
+      keyword:
+        type: string
       page:
         type: integer
       page_size:
@@ -411,6 +431,8 @@ definitions:
         enum:
         - tenant
         - platform
+        type: string
+      status:
         type: string
       tenant_id:
         type: string
@@ -570,6 +592,13 @@ definitions:
     required:
     - role_permission_id
     - version
+    type: object
+  httptransport.RoleBatchBody:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/httptransport.RoleBody'
+        type: array
     type: object
   httptransport.RoleBody:
     properties:
@@ -1200,6 +1229,34 @@ paths:
       summary: Revoke a role permission in the current tenant or platform scope
       tags:
       - authorization-role-permissions
+  /api/v1/authorization/my-roles/batch-get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Scoped role IDs (maximum 100)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.BatchGetMyRolesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.RoleBatchBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a bounded set of roles in the authenticated user's management scope
+      tags:
+      - authorization-roles
   /api/v1/authorization/my-roles/create:
     post:
       consumes:

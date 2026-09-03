@@ -26,6 +26,8 @@ type Repository interface {
 	GetRole(context.Context, string) (Role, error)
 	UpdateRole(context.Context, sqlx.ExtContext, Role) error
 	ListRoles(context.Context, string, int, int) ([]Role, int64, error)
+	SearchRoles(context.Context, string, string, string, int, int) ([]Role, int64, error)
+	BatchGetRoles(context.Context, string, []string) ([]Role, error)
 	GetPermission(context.Context, string) (Permission, error)
 	CreateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error
 	GetRolePermission(context.Context, string) (RolePermission, error)
@@ -134,6 +136,43 @@ func (r *SQLRepository) ListRoles(ctx context.Context, tenantID string, limit, o
 		return nil, 0, fmt.Errorf("list roles: %w", err)
 	}
 	return items, total, nil
+}
+
+func (r *SQLRepository) SearchRoles(ctx context.Context, tenantID, keyword, status string, limit, offset int) ([]Role, int64, error) {
+	where := " WHERE tenant_id = ?"
+	args := []any{tenantID}
+	if status != "" {
+		where += " AND status = ?"
+		args = append(args, status)
+	}
+	if keyword != "" {
+		where += " AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?))"
+		pattern := "%" + keyword + "%"
+		args = append(args, pattern, pattern)
+	}
+	var total int64
+	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM roles"+where), args...); err != nil {
+		return nil, 0, fmt.Errorf("count searched roles: %w", err)
+	}
+	items := make([]Role, 0, limit)
+	queryArgs := append(append([]any(nil), args...), limit, offset)
+	query := "SELECT " + roleColumns + " FROM roles" + where + " ORDER BY code, id LIMIT ? OFFSET ?"
+	if err := r.db.SelectContext(ctx, &items, r.db.Rebind(query), queryArgs...); err != nil {
+		return nil, 0, fmt.Errorf("search roles: %w", err)
+	}
+	return items, total, nil
+}
+
+func (r *SQLRepository) BatchGetRoles(ctx context.Context, tenantID string, ids []string) ([]Role, error) {
+	query, args, err := sqlx.In("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND id IN (?) ORDER BY id", tenantID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("build batch role query: %w", err)
+	}
+	items := make([]Role, 0, len(ids))
+	if err := r.db.SelectContext(ctx, &items, r.db.Rebind(query), args...); err != nil {
+		return nil, fmt.Errorf("batch get roles: %w", err)
+	}
+	return items, nil
 }
 
 func (r *SQLRepository) CreateRolePermission(ctx context.Context, exec sqlx.ExtContext, value RolePermission) error {

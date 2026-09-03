@@ -69,6 +69,39 @@ func TestSQLRepositoryListPermissionCatalogScopesSearchAndActiveStatus(t *testin
 	}
 }
 
+func TestSQLRepositorySearchAndBatchRolesRemainTenantScoped(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	where := " WHERE tenant_id = ? AND status = ? AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?))"
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM roles"+where))).
+		WithArgs("tenant-1", "active", "%oper%", "%oper%").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	now := time.Now()
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+roleColumns+" FROM roles"+where+" ORDER BY code, id LIMIT ? OFFSET ?"))).
+		WithArgs("tenant-1", "active", "%oper%", "%oper%", 20, 0).
+		WillReturnRows(sqlmock.NewRows(strings.Split(roleColumns, ", ")).AddRow("role-1", "tenant-1", "operator", "Operator", "", "tenant", "active", 1, now, now, "user-1", "user-1"))
+	items, total, err := repository.SearchRoles(t.Context(), "tenant-1", "oper", "active", 20, 0)
+	if err != nil || total != 1 || len(items) != 1 {
+		t.Fatalf("SearchRoles() = (%+v, %d, %v)", items, total, err)
+	}
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND id IN (?, ?) ORDER BY id"))).
+		WithArgs("tenant-1", "role-1", "role-2").
+		WillReturnRows(sqlmock.NewRows(strings.Split(roleColumns, ", ")).AddRow("role-1", "tenant-1", "operator", "Operator", "", "tenant", "active", 1, now, now, "user-1", "user-1"))
+	items, err = repository.BatchGetRoles(t.Context(), "tenant-1", []string{"role-1", "role-2"})
+	if err != nil || len(items) != 1 {
+		t.Fatalf("BatchGetRoles() = (%+v, %v)", items, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSQLRepositoryBootstrapTenantOwnerCreatesReservedGrantGraph(t *testing.T) {
 	t.Parallel()
 	database, mock, err := sqlmock.New()

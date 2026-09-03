@@ -251,6 +251,53 @@ func (s *Service) ListRoles(ctx context.Context, tenantID string, page, pageSize
 	return Page[Role]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
+func (s *Service) SearchRoles(ctx context.Context, tenantID, keyword, status string, page, pageSize int) (Page[Role], error) {
+	tenantID, keyword, status = strings.TrimSpace(tenantID), strings.TrimSpace(keyword), strings.TrimSpace(status)
+	if len(keyword) > 100 {
+		return Page[Role]{}, apperror.Invalid("role keyword must not exceed 100 bytes", nil)
+	}
+	if status != "" && status != "active" && status != "disabled" {
+		return Page[Role]{}, apperror.Invalid("invalid role status", nil)
+	}
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Role]{}, err
+	}
+	page, pageSize, err := normalizePage(page, pageSize)
+	if err != nil {
+		return Page[Role]{}, err
+	}
+	items, total, err := s.repository.SearchRoles(ctx, tenantID, keyword, status, pageSize, (page-1)*pageSize)
+	return Page[Role]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
+}
+
+func (s *Service) BatchGetRoles(ctx context.Context, tenantID string, ids []string) ([]Role, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return nil, err
+	}
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return nil, apperror.Invalid("role_ids must not contain empty values", nil)
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return []Role{}, nil
+	}
+	if len(unique) > 100 {
+		return nil, apperror.Invalid("role_ids must not contain more than 100 values", nil)
+	}
+	items, err := s.repository.BatchGetRoles(ctx, tenantID, unique)
+	return items, translate(err)
+}
+
 func (s *Service) GrantRolePermission(ctx context.Context, tenantID, roleID, permissionID string) (RolePermission, error) {
 	role, err := s.repository.GetRole(ctx, roleID)
 	if err != nil {
