@@ -134,6 +134,13 @@ func (s *authorizationServer) CreateBinding(ctx context.Context, request *author
 	}
 	return &authorizationv1.CreateBindingResponse{Binding: toProtoBinding(value)}, nil
 }
+func (s *authorizationServer) GetBinding(ctx context.Context, request *authorizationv1.GetBindingRequest) (*authorizationv1.GetBindingResponse, error) {
+	value, err := s.service.GetBinding(ctx, request.GetBindingId())
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &authorizationv1.GetBindingResponse{Binding: toProtoBinding(value)}, nil
+}
 func (s *authorizationServer) RevokeBinding(ctx context.Context, request *authorizationv1.RevokeBindingRequest) (*authorizationv1.RevokeBindingResponse, error) {
 	value, err := s.service.RevokeBinding(ctx, request.GetBindingId(), request.GetExpectedVersion())
 	if err != nil {

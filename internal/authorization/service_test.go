@@ -34,6 +34,7 @@ type fakeRepository struct {
 	roleSearchOffset    int
 	roleBatchTenant     string
 	roleBatchIDs        []string
+	binding             *Binding
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
@@ -96,8 +97,11 @@ func (*fakeRepository) BatchGetRolePermissions(context.Context, string, []string
 	return nil, nil
 }
 func (*fakeRepository) CreateBinding(context.Context, sqlx.ExtContext, Binding) error { return nil }
-func (*fakeRepository) GetBinding(context.Context, string) (Binding, error) {
-	return Binding{}, ErrNotFound
+func (f *fakeRepository) GetBinding(context.Context, string) (Binding, error) {
+	if f.binding == nil {
+		return Binding{}, ErrNotFound
+	}
+	return *f.binding, nil
 }
 func (*fakeRepository) UpdateBinding(context.Context, sqlx.ExtContext, Binding) error { return nil }
 func (*fakeRepository) ListBindings(context.Context, string, string, string, int, int) ([]Binding, int64, error) {
@@ -108,6 +112,20 @@ func (f *fakeRepository) Resolve(_ context.Context, tenantID, subjectID, subject
 	f.resolveCalls++
 	f.resolvedTenant, f.resolvedSubject, f.resolvedSubjectType = tenantID, subjectID, subjectType
 	return f.grants, f.policyVersion, nil
+}
+
+func TestGetBindingEnforcesTenantScope(t *testing.T) {
+	t.Parallel()
+	service := NewService(&fakeRepository{binding: &Binding{ID: "binding-1", TenantID: "tenant-1", AuditFields: AuditFields{Version: 4}}}, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	value, err := service.GetBinding(ctx, " binding-1 ")
+	if err != nil || value.Version != 4 {
+		t.Fatalf("GetBinding() = (%+v, %v)", value, err)
+	}
+	other := principal.WithContext(t.Context(), principal.Principal{ID: "user-2", Type: principal.TypeUser, TenantID: "tenant-2", MembershipID: "membership-2"})
+	if _, err := service.GetBinding(other, "binding-1"); err == nil {
+		t.Fatal("cross-tenant binding lookup must fail")
+	}
 }
 func (f *fakeRepository) ResolvePermissionCodes(_ context.Context, tenantID, subjectID, subjectType string, _ []string) ([]resolvedPermissionCodeGrant, uint64, error) {
 	f.resolvedTenant, f.resolvedSubject, f.resolvedSubjectType = tenantID, subjectID, subjectType

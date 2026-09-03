@@ -76,6 +76,7 @@ func authorizationHTTPRequirement(route string) (platformauthz.Requirement, bool
 		"/api/v1/authorization/role-permissions/revoke": {Resource: "authorization.role-permission", Action: "revoke", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/role-permissions/list":   {Resource: "authorization.role-permission", Action: "list", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/bindings/create":         {Resource: "authorization.binding", Action: "create", Scope: platformauthz.ScopePrincipal},
+		"/api/v1/authorization/bindings/get":            {Resource: "authorization.binding", Action: "read", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/bindings/revoke":         {Resource: "authorization.binding", Action: "revoke", Scope: platformauthz.ScopePrincipal},
 		"/api/v1/authorization/bindings/list":           {Resource: "authorization.binding", Action: "list", Scope: platformauthz.ScopePrincipal},
 	}

@@ -115,6 +115,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/authorization/bindings/get": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-bindings"
+                ],
+                "summary": "Get a role binding by ID",
+                "parameters": [
+                    {
+                        "description": "Binding ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.GetBindingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.BindingBody"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/authorization/bindings/list": {
             "post": {
                 "security": [
@@ -290,6 +340,56 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/httptransport.CreateMyBindingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httptransport.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "body": {
+                                            "$ref": "#/definitions/httptransport.BindingBody"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/authorization/my-bindings/get": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authorization-bindings"
+                ],
+                "summary": "Get a role binding in the current authorization context",
+                "parameters": [
+                    {
+                        "description": "Binding ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httptransport.GetBindingRequest"
                         }
                     }
                 ],
@@ -2139,6 +2239,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/httptransport.DecisionBody"
                     }
+                }
+            }
+        },
+        "httptransport.GetBindingRequest": {
+            "type": "object",
+            "required": [
+                "binding_id"
+            ],
+            "properties": {
+                "binding_id": {
+                    "type": "string"
                 }
             }
         },

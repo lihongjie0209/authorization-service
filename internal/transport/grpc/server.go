@@ -86,6 +86,7 @@ func authorizationGRPCRequirement(enabled bool) platformauthz.GRPCResolver {
 			authorizationv1.AuthorizationService_ListRolePermissions_FullMethodName:  {Resource: "authorization.role-permission", Action: "list", Scope: platformauthz.ScopePrincipal},
 			authorizationv1.AuthorizationService_CreateBinding_FullMethodName:        {Resource: "authorization.binding", Action: "create", Scope: platformauthz.ScopePrincipal},
 			authorizationv1.AuthorizationService_RevokeBinding_FullMethodName:        {Resource: "authorization.binding", Action: "revoke", Scope: platformauthz.ScopePrincipal},
+			authorizationv1.AuthorizationService_GetBinding_FullMethodName:           {Resource: "authorization.binding", Action: "read", Scope: platformauthz.ScopePrincipal},
 			authorizationv1.AuthorizationService_ListBindings_FullMethodName:         {Resource: "authorization.binding", Action: "list", Scope: platformauthz.ScopePrincipal},
 		}
 		requirement, ok := requirements[method]

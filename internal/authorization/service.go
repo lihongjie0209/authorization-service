@@ -446,6 +446,21 @@ func (s *Service) RevokeBinding(ctx context.Context, id string, version int64) (
 	return s.repository.GetBinding(ctx, id)
 }
 
+func (s *Service) GetBinding(ctx context.Context, id string) (Binding, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Binding{}, apperror.Invalid("binding_id is required", nil)
+	}
+	value, err := s.repository.GetBinding(ctx, id)
+	if err != nil {
+		return Binding{}, translate(err)
+	}
+	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
+		return Binding{}, err
+	}
+	return value, nil
+}
+
 func (s *Service) ListBindings(ctx context.Context, tenantID, subjectID, subjectType string, page, pageSize int) (Page[Binding], error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {

@@ -156,6 +156,9 @@ type RevokeBindingRequest struct {
 	BindingID string `json:"binding_id" binding:"required"`
 	Version   int64  `json:"version" binding:"required,gt=0"`
 }
+type GetBindingRequest struct {
+	BindingID string `json:"binding_id" binding:"required"`
+}
 type ListBindingsRequest struct {
 	TenantID    string `json:"tenant_id" binding:"required"`
 	SubjectID   string `json:"subject_id"`
@@ -820,6 +823,40 @@ func (h *Handler) RevokeBinding(c *gin.Context) {
 	}
 	OK(c, bindingBody(value))
 }
+
+// GetBinding godoc
+// @Summary Get a role binding by ID
+// @Tags authorization-bindings
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body GetBindingRequest true "Binding ID"
+// @Success 200 {object} Response{body=BindingBody}
+// @Router /api/v1/authorization/bindings/get [post]
+func (h *Handler) GetBinding(c *gin.Context) {
+	var request GetBindingRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	value, err := h.authorization.GetBinding(c.Request.Context(), request.BindingID)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, bindingBody(value))
+}
+
+// GetMyBinding godoc
+// @Summary Get a role binding in the current authorization context
+// @Tags authorization-bindings
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body GetBindingRequest true "Binding ID"
+// @Success 200 {object} Response{body=BindingBody}
+// @Router /api/v1/authorization/my-bindings/get [post]
+func (h *Handler) GetMyBinding(c *gin.Context) { h.GetBinding(c) }
 
 // ListBindings godoc
 // @Summary List tenant or subject role bindings

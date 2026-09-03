@@ -319,6 +319,13 @@ definitions:
           $ref: '#/definitions/httptransport.DecisionBody'
         type: array
     type: object
+  httptransport.GetBindingRequest:
+    properties:
+      binding_id:
+        type: string
+    required:
+    - binding_id
+    type: object
   httptransport.GrantMyRolePermissionRequest:
     properties:
       permission_id:
@@ -851,6 +858,34 @@ paths:
       summary: Bind a role to a membership, group, or service account
       tags:
       - authorization-bindings
+  /api/v1/authorization/bindings/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Binding ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetBindingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.BindingBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a role binding by ID
+      tags:
+      - authorization-bindings
   /api/v1/authorization/bindings/list:
     post:
       consumes:
@@ -961,6 +996,34 @@ paths:
       security:
       - Bearer: []
       summary: Bind a role in the current tenant or platform scope
+      tags:
+      - authorization-bindings
+  /api/v1/authorization/my-bindings/get:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Binding ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httptransport.GetBindingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httptransport.Response'
+            - properties:
+                body:
+                  $ref: '#/definitions/httptransport.BindingBody'
+              type: object
+      security:
+      - Bearer: []
+      summary: Get a role binding in the current authorization context
       tags:
       - authorization-bindings
   /api/v1/authorization/my-bindings/list:
