@@ -326,6 +326,22 @@ definitions:
     required:
     - binding_id
     type: object
+  httptransport.GetMyBindingRequest:
+    properties:
+      binding_id:
+        type: string
+      permission_scope:
+        enum:
+        - tenant
+        - platform
+        type: string
+      tenant_id:
+        type: string
+    required:
+    - binding_id
+    - permission_scope
+    - tenant_id
+    type: object
   httptransport.GrantMyRolePermissionRequest:
     properties:
       permission_id:
@@ -863,12 +879,12 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Binding ID
+      - description: Scoped binding ID
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/httptransport.GetBindingRequest'
+          $ref: '#/definitions/httptransport.GetMyBindingRequest'
       produces:
       - application/json
       responses:

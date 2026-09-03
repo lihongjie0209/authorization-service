@@ -159,6 +159,11 @@ type RevokeBindingRequest struct {
 type GetBindingRequest struct {
 	BindingID string `json:"binding_id" binding:"required"`
 }
+type GetMyBindingRequest struct {
+	TenantID        string `json:"tenant_id" binding:"required"`
+	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	BindingID       string `json:"binding_id" binding:"required"`
+}
 type ListBindingsRequest struct {
 	TenantID    string `json:"tenant_id" binding:"required"`
 	SubjectID   string `json:"subject_id"`
@@ -830,7 +835,7 @@ func (h *Handler) RevokeBinding(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security Bearer
-// @Param request body GetBindingRequest true "Binding ID"
+// @Param request body GetMyBindingRequest true "Scoped binding ID"
 // @Success 200 {object} Response{body=BindingBody}
 // @Router /api/v1/authorization/bindings/get [post]
 func (h *Handler) GetBinding(c *gin.Context) {
@@ -856,7 +861,22 @@ func (h *Handler) GetBinding(c *gin.Context) {
 // @Param request body GetBindingRequest true "Binding ID"
 // @Success 200 {object} Response{body=BindingBody}
 // @Router /api/v1/authorization/my-bindings/get [post]
-func (h *Handler) GetMyBinding(c *gin.Context) { h.GetBinding(c) }
+func (h *Handler) GetMyBinding(c *gin.Context) {
+	var request GetMyBindingRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
+		return
+	}
+	if _, ok := h.authorizeUserBindingManagement(c, request.TenantID, request.PermissionScope, "read"); !ok {
+		return
+	}
+	value, err := h.authorization.GetBinding(c.Request.Context(), request.BindingID)
+	if err != nil {
+		Fail(c, h.logger, err)
+		return
+	}
+	OK(c, bindingBody(value))
+}
 
 // ListBindings godoc
 // @Summary List tenant or subject role bindings

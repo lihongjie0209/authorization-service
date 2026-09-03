@@ -134,12 +134,12 @@ const docTemplate = `{
                 "summary": "Get a role binding by ID",
                 "parameters": [
                     {
-                        "description": "Binding ID",
+                        "description": "Scoped binding ID",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/httptransport.GetBindingRequest"
+                            "$ref": "#/definitions/httptransport.GetMyBindingRequest"
                         }
                     }
                 ],
@@ -2249,6 +2249,29 @@ const docTemplate = `{
             ],
             "properties": {
                 "binding_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httptransport.GetMyBindingRequest": {
+            "type": "object",
+            "required": [
+                "binding_id",
+                "permission_scope",
+                "tenant_id"
+            ],
+            "properties": {
+                "binding_id": {
+                    "type": "string"
+                },
+                "permission_scope": {
+                    "type": "string",
+                    "enum": [
+                        "tenant",
+                        "platform"
+                    ]
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
