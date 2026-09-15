@@ -1,4 +1,4 @@
-.PHONY: run build clean docker-build test test-race test-integration ci-test-integration lint fmt swagger swagger-check migrate-up migrate-down bootstrap-admin dev-up dev-down dev-logs
+.PHONY: run build clean docker-build modules-check test test-race test-integration ci-test-integration lint fmt swagger swagger-check migrate-up migrate-down bootstrap-admin dev-up dev-down dev-logs
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
@@ -24,6 +24,9 @@ docker-build:
 		--build-arg COMMIT="$(COMMIT)" \
 		--build-arg BUILD_TIME="$(BUILD_TIME)" \
 		--tag authorization-service:$(VERSION) .
+
+modules-check:
+	@tmp_dir=$$(mktemp -d); trap 'rm -rf "$$tmp_dir"' EXIT; cp go.mod go.sum "$$tmp_dir/"; GOWORK=off go mod tidy; diff -u "$$tmp_dir/go.mod" go.mod; diff -u "$$tmp_dir/go.sum" go.sum
 
 test:
 	go test ./...
