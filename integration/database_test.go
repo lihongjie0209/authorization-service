@@ -153,7 +153,7 @@ func startDatabase(t *testing.T, ctx context.Context, databaseType string) (stri
 		// Match the runtime database.Open configuration. MySQL DATETIME values do
 		// not carry timezone information, so the driver location must be explicit
 		// for audit timestamps and time-range filters to use the same wall clock.
-		dsn, err := container.ConnectionString(ctx, "parseTime=true&loc=Asia%2FShanghai")
+		dsn, err := container.ConnectionString(ctx, "parseTime=true&loc=Asia%2FShanghai&time_zone=%27%2B08%3A00%27")
 		if err != nil {
 			t.Fatal(err)
 		}
