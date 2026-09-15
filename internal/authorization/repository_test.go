@@ -111,16 +111,64 @@ func TestSQLRepositoryBatchGetRolePermissionsFiltersRoleAndPermissions(t *testin
 	t.Cleanup(func() { _ = database.Close() })
 	db := sqlx.NewDb(database, "postgres")
 	repository := &SQLRepository{db: db}
-	query := db.Rebind("SELECT " + rolePermissionColumns + " FROM role_permissions WHERE role_id = ? AND deleted_at IS NULL AND permission_id IN (?, ?) ORDER BY id")
+	query := db.Rebind("SELECT " + rolePermissionColumns + " FROM role_permissions WHERE tenant_id = ? AND role_id = ? AND deleted_at IS NULL AND permission_id IN (?, ?) ORDER BY id")
 	now := time.Now()
 	mock.ExpectQuery(regexp.QuoteMeta(query)).
-		WithArgs("role-1", "permission-1", "permission-2").
+		WithArgs("tenant-1", "role-1", "permission-1", "permission-2").
 		WillReturnRows(sqlmock.NewRows(strings.Split(rolePermissionColumns, ", ")).
 			AddRow("assignment-1", "tenant-1", "role-1", "permission-1", "active", 1, now, now, "user-1", "user-1"))
-	items, err := repository.BatchGetRolePermissions(t.Context(), "role-1", []string{"permission-1", "permission-2"})
+	items, err := repository.BatchGetRolePermissions(t.Context(), "tenant-1", "role-1", []string{"permission-1", "permission-2"})
 	if err != nil || len(items) != 1 || items[0].PermissionID != "permission-1" {
 		t.Fatalf("BatchGetRolePermissions() = (%+v, %v)", items, err)
 	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLRepositoryGlobalIDLookupsRequireTenant(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	now := time.Now()
+
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL"))).
+		WithArgs("tenant-1", "permission-1").
+		WillReturnRows(sqlmock.NewRows(strings.Split(permissionColumns, ", ")).
+			AddRow("permission-1", "tenant-1", "invoice.read", "Read invoices", "invoice", "read", "active", 1, now, now, "user-1", "user-1", ""))
+	if _, err := repository.GetPermission(t.Context(), "tenant-1", "permission-1"); err != nil {
+		t.Fatalf("GetPermission() error = %v", err)
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL"))).
+		WithArgs("tenant-1", "role-1").
+		WillReturnRows(sqlmock.NewRows(strings.Split(roleColumns, ", ")).
+			AddRow("role-1", "tenant-1", "auditor", "Auditor", "", "tenant", "active", 1, now, now, "user-1", "user-1"))
+	if _, err := repository.GetRole(t.Context(), "tenant-1", "role-1"); err != nil {
+		t.Fatalf("GetRole() error = %v", err)
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL"))).
+		WithArgs("tenant-1", "assignment-1").
+		WillReturnRows(sqlmock.NewRows(strings.Split(rolePermissionColumns, ", ")).
+			AddRow("assignment-1", "tenant-1", "role-1", "permission-1", "active", 1, now, now, "user-1", "user-1"))
+	if _, err := repository.GetRolePermission(t.Context(), "tenant-1", "assignment-1"); err != nil {
+		t.Fatalf("GetRolePermission() error = %v", err)
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+bindingColumns+" FROM role_bindings WHERE tenant_id = ? AND id = ? AND deleted_at IS NULL"))).
+		WithArgs("tenant-1", "binding-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "subject_id", "subject_type", "role_id", "organization_unit_id", "status", "version", "created_at", "updated_at", "created_by", "updated_by"}).
+			AddRow("binding-1", "tenant-1", "membership-1", "membership", "role-1", "", "active", 1, now, now, "user-1", "user-1"))
+	if _, err := repository.GetBinding(t.Context(), "tenant-1", "binding-1"); err != nil {
+		t.Fatalf("GetBinding() error = %v", err)
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}

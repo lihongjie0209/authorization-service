@@ -51,7 +51,7 @@ func (f *fakeRepository) ListPermissionCatalog(_ context.Context, tenantID, sear
 	return f.catalogItems, int64(len(f.catalogItems)), nil
 }
 func (*fakeRepository) CreateRole(context.Context, sqlx.ExtContext, Role) error { return nil }
-func (f *fakeRepository) GetRole(context.Context, string) (Role, error) {
+func (f *fakeRepository) GetRole(context.Context, string, string) (Role, error) {
 	if f.role == nil {
 		return Role{}, ErrNotFound
 	}
@@ -75,30 +75,33 @@ func (f *fakeRepository) BatchGetRoles(_ context.Context, tenantID string, ids [
 	}
 	return []Role{*f.role}, nil
 }
-func (*fakeRepository) GetPermission(context.Context, string) (Permission, error) {
+func (*fakeRepository) GetPermission(context.Context, string, string) (Permission, error) {
 	return Permission{}, ErrNotFound
 }
 func (*fakeRepository) CreateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error {
 	return nil
 }
-func (*fakeRepository) GetRolePermission(context.Context, string) (RolePermission, error) {
+func (*fakeRepository) GetRolePermission(context.Context, string, string) (RolePermission, error) {
 	return RolePermission{}, ErrNotFound
 }
-func (*fakeRepository) GetRolePermissionByPair(context.Context, string, string) (RolePermission, error) {
+func (*fakeRepository) GetRolePermissionByPair(context.Context, string, string, string) (RolePermission, error) {
 	return RolePermission{}, ErrNotFound
 }
 func (*fakeRepository) UpdateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error {
 	return nil
 }
-func (*fakeRepository) ListRolePermissions(context.Context, string) ([]RolePermission, error) {
+func (*fakeRepository) ListRolePermissions(context.Context, string, string) ([]RolePermission, error) {
 	return nil, nil
 }
-func (*fakeRepository) BatchGetRolePermissions(context.Context, string, []string) ([]RolePermission, error) {
+func (*fakeRepository) BatchGetRolePermissions(context.Context, string, string, []string) ([]RolePermission, error) {
 	return nil, nil
 }
 func (*fakeRepository) CreateBinding(context.Context, sqlx.ExtContext, Binding) error { return nil }
-func (f *fakeRepository) GetBinding(context.Context, string) (Binding, error) {
+func (f *fakeRepository) GetBinding(_ context.Context, tenantID, _ string) (Binding, error) {
 	if f.binding == nil {
+		return Binding{}, ErrNotFound
+	}
+	if f.binding.TenantID != tenantID {
 		return Binding{}, ErrNotFound
 	}
 	return *f.binding, nil
@@ -118,12 +121,12 @@ func TestGetBindingEnforcesTenantScope(t *testing.T) {
 	t.Parallel()
 	service := NewService(&fakeRepository{binding: &Binding{ID: "binding-1", TenantID: "tenant-1", AuditFields: AuditFields{Version: 4}}}, &database.Transactor{})
 	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
-	value, err := service.GetBinding(ctx, " binding-1 ")
+	value, err := service.GetBinding(ctx, "tenant-1", " binding-1 ")
 	if err != nil || value.Version != 4 {
 		t.Fatalf("GetBinding() = (%+v, %v)", value, err)
 	}
 	other := principal.WithContext(t.Context(), principal.Principal{ID: "user-2", Type: principal.TypeUser, TenantID: "tenant-2", MembershipID: "membership-2"})
-	if _, err := service.GetBinding(other, "binding-1"); err == nil {
+	if _, err := service.GetBinding(other, "tenant-2", "binding-1"); err == nil {
 		t.Fatal("cross-tenant binding lookup must fail")
 	}
 }
@@ -210,7 +213,7 @@ func TestService_UpdateRoleRejectsCrossTenantResourceID(t *testing.T) {
 	repository := &fakeRepository{role: &Role{ID: "role-2", TenantID: "tenant-2", Name: "Other role", DataScope: "tenant", Status: "active", AuditFields: AuditFields{Version: 1}}}
 	service := NewService(repository, &database.Transactor{})
 	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
-	if _, err := service.UpdateRole(ctx, "role-2", "Changed", "", "tenant", "active", 1); err == nil {
+	if _, err := service.UpdateRole(ctx, "tenant-1", "role-2", "Changed", "", "tenant", "active", 1); err == nil {
 		t.Fatal("cross-tenant role ID must be rejected before update")
 	}
 }
@@ -264,7 +267,7 @@ func TestService_BatchGetRolePermissionsValidatesBoundedIDs(t *testing.T) {
 	repository := &fakeRepository{role: &Role{ID: "role-1", TenantID: "tenant-1"}}
 	service := NewService(repository, &database.Transactor{})
 	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
-	items, err := service.BatchGetRolePermissions(ctx, "role-1", nil)
+	items, err := service.BatchGetRolePermissions(ctx, "tenant-1", "role-1", nil)
 	if err != nil || len(items) != 0 {
 		t.Fatalf("empty BatchGetRolePermissions() = (%+v, %v)", items, err)
 	}
@@ -272,7 +275,7 @@ func TestService_BatchGetRolePermissionsValidatesBoundedIDs(t *testing.T) {
 	for index := range tooMany {
 		tooMany[index] = fmt.Sprintf("permission-%d", index)
 	}
-	if _, err := service.BatchGetRolePermissions(ctx, "role-1", tooMany); err == nil {
+	if _, err := service.BatchGetRolePermissions(ctx, "tenant-1", "role-1", tooMany); err == nil {
 		t.Fatal("oversized permission batch must fail")
 	}
 }
@@ -377,7 +380,7 @@ func TestService_CreatePermissionRequiresActor(t *testing.T) {
 func TestService_UpdatePermissionRejectsInvalidCondition(t *testing.T) {
 	t.Parallel()
 	service := NewService(&fakeRepository{}, &database.Transactor{})
-	_, err := service.UpdatePermission(t.Context(), "permission-1", "Read invoices", "attributes[", "active", 1)
+	_, err := service.UpdatePermission(t.Context(), "tenant-1", "permission-1", "Read invoices", "attributes[", "active", 1)
 	appErr, ok := err.(*apperror.Error)
 	if !ok || appErr.Code != apperror.CodeInvalidArgument {
 		t.Fatalf("UpdatePermission() error = %v, want invalid argument", err)

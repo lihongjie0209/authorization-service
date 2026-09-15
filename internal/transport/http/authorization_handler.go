@@ -53,6 +53,7 @@ type ListMyPermissionsRequest struct {
 	PageSize        int    `json:"page_size"`
 }
 type UpdatePermissionRequest struct {
+	TenantID            string `json:"tenant_id" binding:"required"`
 	PermissionID        string `json:"permission_id" binding:"required"`
 	Name                string `json:"name" binding:"required"`
 	ConditionExpression string `json:"condition_expression"`
@@ -60,6 +61,7 @@ type UpdatePermissionRequest struct {
 	Version             int64  `json:"version" binding:"required,gt=0"`
 }
 type GetPermissionRequest struct {
+	TenantID     string `json:"tenant_id" binding:"required"`
 	PermissionID string `json:"permission_id" binding:"required"`
 }
 type GetMyPermissionRequest struct {
@@ -75,6 +77,7 @@ type CreateRoleRequest struct {
 	DataScope   string `json:"data_scope" binding:"required"`
 }
 type UpdateRoleRequest struct {
+	TenantID    string `json:"tenant_id" binding:"required"`
 	RoleID      string `json:"role_id" binding:"required"`
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
@@ -83,7 +86,8 @@ type UpdateRoleRequest struct {
 	Version     int64  `json:"version" binding:"required,gt=0"`
 }
 type GetRoleRequest struct {
-	RoleID string `json:"role_id" binding:"required"`
+	TenantID string `json:"tenant_id" binding:"required"`
+	RoleID   string `json:"role_id" binding:"required"`
 }
 type GetMyRoleRequest struct {
 	TenantID        string `json:"tenant_id" binding:"required"`
@@ -132,11 +136,13 @@ type GrantRolePermissionRequest struct {
 	PermissionID string `json:"permission_id" binding:"required"`
 }
 type RevokeRolePermissionRequest struct {
+	TenantID         string `json:"tenant_id" binding:"required"`
 	RolePermissionID string `json:"role_permission_id" binding:"required"`
 	Version          int64  `json:"version" binding:"required,gt=0"`
 }
 type ListRolePermissionsRequest struct {
-	RoleID string `json:"role_id" binding:"required"`
+	TenantID string `json:"tenant_id" binding:"required"`
+	RoleID   string `json:"role_id" binding:"required"`
 }
 type GrantMyRolePermissionRequest struct {
 	TenantID        string `json:"tenant_id" binding:"required"`
@@ -169,10 +175,12 @@ type CreateBindingRequest struct {
 	OrganizationUnitID string `json:"organization_unit_id"`
 }
 type RevokeBindingRequest struct {
+	TenantID  string `json:"tenant_id" binding:"required"`
 	BindingID string `json:"binding_id" binding:"required"`
 	Version   int64  `json:"version" binding:"required,gt=0"`
 }
 type GetBindingRequest struct {
+	TenantID  string `json:"tenant_id" binding:"required"`
 	BindingID string `json:"binding_id" binding:"required"`
 }
 type GetMyBindingRequest struct {
@@ -265,7 +273,7 @@ func (h *Handler) GetPermission(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	v, err := h.authorization.GetPermission(c.Request.Context(), r.PermissionID)
+	v, err := h.authorization.GetPermission(c.Request.Context(), r.TenantID, r.PermissionID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -288,7 +296,7 @@ func (h *Handler) UpdatePermission(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.UpdatePermission(c.Request.Context(), request.PermissionID, request.Name, request.ConditionExpression, request.Status, request.Version)
+	value, err := h.authorization.UpdatePermission(c.Request.Context(), request.TenantID, request.PermissionID, request.Name, request.ConditionExpression, request.Status, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -417,7 +425,7 @@ func (h *Handler) GetMyPermission(c *gin.Context) {
 	if _, ok := h.authorizeUserPermissionManagement(c, r.TenantID, r.PermissionScope, "read"); !ok {
 		return
 	}
-	v, err := h.authorization.GetPermission(c.Request.Context(), r.PermissionID)
+	v, err := h.authorization.GetPermission(c.Request.Context(), r.TenantID, r.PermissionID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -443,7 +451,7 @@ func (h *Handler) UpdateMyPermission(c *gin.Context) {
 	if _, ok := h.authorizeUserPermissionManagement(c, request.TenantID, request.PermissionScope, "update"); !ok {
 		return
 	}
-	value, err := h.authorization.UpdatePermission(c.Request.Context(), request.PermissionID, request.Name, request.ConditionExpression, request.Status, request.Version)
+	value, err := h.authorization.UpdatePermission(c.Request.Context(), request.TenantID, request.PermissionID, request.Name, request.ConditionExpression, request.Status, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -516,7 +524,7 @@ func (h *Handler) GetRole(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	v, err := h.authorization.GetRole(c.Request.Context(), r.RoleID)
+	v, err := h.authorization.GetRole(c.Request.Context(), r.TenantID, r.RoleID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -539,7 +547,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.UpdateRole(c.Request.Context(), request.RoleID, request.Name, request.Description, request.DataScope, request.Status, request.Version)
+	value, err := h.authorization.UpdateRole(c.Request.Context(), request.TenantID, request.RoleID, request.Name, request.Description, request.DataScope, request.Status, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -625,7 +633,7 @@ func (h *Handler) GetMyRole(c *gin.Context) {
 	if _, ok := h.authorizeUserRoleManagement(c, r.TenantID, r.PermissionScope, "read"); !ok {
 		return
 	}
-	v, err := h.authorization.GetRole(c.Request.Context(), r.RoleID)
+	v, err := h.authorization.GetRole(c.Request.Context(), r.TenantID, r.RoleID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -651,7 +659,7 @@ func (h *Handler) UpdateMyRole(c *gin.Context) {
 	if _, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "update"); !ok {
 		return
 	}
-	value, err := h.authorization.UpdateRole(c.Request.Context(), request.RoleID, request.Name, request.Description, request.DataScope, request.Status, request.Version)
+	value, err := h.authorization.UpdateRole(c.Request.Context(), request.TenantID, request.RoleID, request.Name, request.Description, request.DataScope, request.Status, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -751,7 +759,7 @@ func (h *Handler) RevokeRolePermission(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.RevokeRolePermission(c.Request.Context(), request.RolePermissionID, request.Version)
+	value, err := h.authorization.RevokeRolePermission(c.Request.Context(), request.TenantID, request.RolePermissionID, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -774,7 +782,7 @@ func (h *Handler) ListRolePermissions(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.ListRolePermissions(c.Request.Context(), request.RoleID)
+	value, err := h.authorization.ListRolePermissions(c.Request.Context(), request.TenantID, request.RoleID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -837,7 +845,7 @@ func (h *Handler) RevokeMyRolePermission(c *gin.Context) {
 	if _, ok := h.authorizeUserRolePermissionManagement(c, request.TenantID, request.PermissionScope, "revoke"); !ok {
 		return
 	}
-	value, err := h.authorization.RevokeRolePermission(c.Request.Context(), request.RolePermissionID, request.Version)
+	value, err := h.authorization.RevokeRolePermission(c.Request.Context(), request.TenantID, request.RolePermissionID, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -863,7 +871,7 @@ func (h *Handler) ListMyRolePermissions(c *gin.Context) {
 	if _, ok := h.authorizeUserRolePermissionManagement(c, request.TenantID, request.PermissionScope, "list"); !ok {
 		return
 	}
-	value, err := h.authorization.ListRolePermissions(c.Request.Context(), request.RoleID)
+	value, err := h.authorization.ListRolePermissions(c.Request.Context(), request.TenantID, request.RoleID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -889,7 +897,7 @@ func (h *Handler) BatchGetMyRolePermissions(c *gin.Context) {
 	if _, ok := h.authorizeUserRoleManagement(c, request.TenantID, request.PermissionScope, "list"); !ok {
 		return
 	}
-	items, err := h.authorization.BatchGetRolePermissions(c.Request.Context(), request.RoleID, request.PermissionIDs)
+	items, err := h.authorization.BatchGetRolePermissions(c.Request.Context(), request.TenantID, request.RoleID, request.PermissionIDs)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -935,7 +943,7 @@ func (h *Handler) RevokeBinding(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.RevokeBinding(c.Request.Context(), request.BindingID, request.Version)
+	value, err := h.authorization.RevokeBinding(c.Request.Context(), request.TenantID, request.BindingID, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -958,7 +966,7 @@ func (h *Handler) GetBinding(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.GetBinding(c.Request.Context(), request.BindingID)
+	value, err := h.authorization.GetBinding(c.Request.Context(), request.TenantID, request.BindingID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -984,7 +992,7 @@ func (h *Handler) GetMyBinding(c *gin.Context) {
 	if _, ok := h.authorizeUserBindingManagement(c, request.TenantID, request.PermissionScope, "read"); !ok {
 		return
 	}
-	value, err := h.authorization.GetBinding(c.Request.Context(), request.BindingID)
+	value, err := h.authorization.GetBinding(c.Request.Context(), request.TenantID, request.BindingID)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -1070,7 +1078,7 @@ func (h *Handler) RevokeMyBinding(c *gin.Context) {
 	if _, ok := h.authorizeUserBindingManagement(c, request.TenantID, request.PermissionScope, "revoke"); !ok {
 		return
 	}
-	value, err := h.authorization.RevokeBinding(c.Request.Context(), request.BindingID, request.Version)
+	value, err := h.authorization.RevokeBinding(c.Request.Context(), request.TenantID, request.BindingID, request.Version)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return

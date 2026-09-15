@@ -105,7 +105,7 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			rolePermissionBatch, err := service.BatchGetRolePermissions(actorCtx, role.ID, []string{permission.ID, uuid.NewString()})
+			rolePermissionBatch, err := service.BatchGetRolePermissions(actorCtx, "tenant-1", role.ID, []string{permission.ID, uuid.NewString()})
 			if err != nil || len(rolePermissionBatch) != 1 || rolePermissionBatch[0].ID != rolePermission.ID {
 				t.Fatalf("BatchGetRolePermissions() = (%+v, %v)", rolePermissionBatch, err)
 			}
@@ -134,21 +134,21 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			if err != nil || !decision.Allowed || decision.DataScope != "organization" || len(decision.OrganizationUnitIDs) != 1 || decision.PolicyVersion != 5 {
 				t.Fatalf("Check() = (%+v, %v)", decision, err)
 			}
-			updated, err := service.UpdateRole(actorCtx, role.ID, "Senior Auditor", role.Description, "tenant", "active", role.Version)
+			updated, err := service.UpdateRole(actorCtx, "tenant-1", role.ID, "Senior Auditor", role.Description, "tenant", "active", role.Version)
 			if err != nil || updated.Version != 2 {
 				t.Fatalf("UpdateRole() = (%+v, %v)", updated, err)
 			}
-			if _, err := service.UpdateRole(actorCtx, role.ID, "Stale", role.Description, "tenant", "active", role.Version); !isStaleVersion(err) {
+			if _, err := service.UpdateRole(actorCtx, "tenant-1", role.ID, "Stale", role.Description, "tenant", "active", role.Version); !isStaleVersion(err) {
 				t.Fatalf("stale UpdateRole() error = %v", err)
 			}
-			if _, err := service.RevokeRolePermission(actorCtx, rolePermission.ID, rolePermission.Version); err != nil {
+			if _, err := service.RevokeRolePermission(actorCtx, "tenant-1", rolePermission.ID, rolePermission.Version); err != nil {
 				t.Fatal(err)
 			}
 			decision, err = service.Check(ctx, "tenant-1", "membership-1", "membership", "invoice", "read")
 			if err != nil || decision.Allowed {
 				t.Fatalf("revoked permission decision = (%+v, %v)", decision, err)
 			}
-			if _, err := service.RevokeBinding(actorCtx, binding.ID, binding.Version); err != nil {
+			if _, err := service.RevokeBinding(actorCtx, "tenant-1", binding.ID, binding.Version); err != nil {
 				t.Fatal(err)
 			}
 

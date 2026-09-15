@@ -2442,10 +2442,14 @@
         "httptransport.GetBindingRequest": {
             "type": "object",
             "required": [
-                "binding_id"
+                "binding_id",
+                "tenant_id"
             ],
             "properties": {
                 "binding_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2522,10 +2526,14 @@
         "httptransport.GetPermissionRequest": {
             "type": "object",
             "required": [
-                "permission_id"
+                "permission_id",
+                "tenant_id"
             ],
             "properties": {
                 "permission_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2533,10 +2541,14 @@
         "httptransport.GetRoleRequest": {
             "type": "object",
             "required": [
-                "role_id"
+                "role_id",
+                "tenant_id"
             ],
             "properties": {
                 "role_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2769,10 +2781,14 @@
         "httptransport.ListRolePermissionsRequest": {
             "type": "object",
             "required": [
-                "role_id"
+                "role_id",
+                "tenant_id"
             ],
             "properties": {
                 "role_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2899,10 +2915,14 @@
             "type": "object",
             "required": [
                 "binding_id",
+                "tenant_id",
                 "version"
             ],
             "properties": {
                 "binding_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {
@@ -2968,10 +2988,14 @@
             "type": "object",
             "required": [
                 "role_permission_id",
+                "tenant_id",
                 "version"
             ],
             "properties": {
                 "role_permission_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {
@@ -3183,6 +3207,7 @@
                 "name",
                 "permission_id",
                 "status",
+                "tenant_id",
                 "version"
             ],
             "properties": {
@@ -3198,6 +3223,9 @@
                 "status": {
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "version": {
                     "type": "integer"
                 }
@@ -3210,6 +3238,7 @@
                 "name",
                 "role_id",
                 "status",
+                "tenant_id",
                 "version"
             ],
             "properties": {
@@ -3226,6 +3255,9 @@
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {

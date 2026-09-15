@@ -160,10 +160,10 @@ func (s *Service) ListPermissionCatalog(ctx context.Context, tenantID, search st
 	return Page[Permission]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
-func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpression, status string, version int64) (Permission, error) {
-	id, name = strings.TrimSpace(id), strings.TrimSpace(name)
+func (s *Service) UpdatePermission(ctx context.Context, tenantID, id, name, conditionExpression, status string, version int64) (Permission, error) {
+	tenantID, id, name = strings.TrimSpace(tenantID), strings.TrimSpace(id), strings.TrimSpace(name)
 	conditionExpression, status = strings.TrimSpace(conditionExpression), strings.ToLower(strings.TrimSpace(status))
-	if id == "" || name == "" || version < 1 || (status != "active" && status != "disabled") {
+	if tenantID == "" || id == "" || name == "" || version < 1 || (status != "active" && status != "disabled") {
 		return Permission{}, apperror.Invalid("invalid permission update", nil)
 	}
 	if conditionExpression != "" {
@@ -171,12 +171,12 @@ func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpre
 			return Permission{}, apperror.Invalid("invalid ABAC condition expression", issues.Err())
 		}
 	}
-	current, err := s.repository.GetPermission(ctx, id)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Permission{}, err
+	}
+	current, err := s.repository.GetPermission(ctx, tenantID, id)
 	if err != nil {
 		return Permission{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, current.TenantID); err != nil {
-		return Permission{}, err
 	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
@@ -191,19 +191,19 @@ func (s *Service) UpdatePermission(ctx context.Context, id, name, conditionExpre
 	}); err != nil {
 		return Permission{}, err
 	}
-	return s.repository.GetPermission(ctx, id)
+	return s.repository.GetPermission(ctx, tenantID, id)
 }
-func (s *Service) GetPermission(ctx context.Context, id string) (Permission, error) {
-	id = strings.TrimSpace(id)
-	if id == "" {
+func (s *Service) GetPermission(ctx context.Context, tenantID, id string) (Permission, error) {
+	tenantID, id = strings.TrimSpace(tenantID), strings.TrimSpace(id)
+	if tenantID == "" || id == "" {
 		return Permission{}, apperror.Invalid("permission_id is required", nil)
 	}
-	value, err := s.repository.GetPermission(ctx, id)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Permission{}, err
+	}
+	value, err := s.repository.GetPermission(ctx, tenantID, id)
 	if err != nil {
 		return Permission{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
-		return Permission{}, err
 	}
 	return value, nil
 }
@@ -228,16 +228,17 @@ func (s *Service) CreateRole(ctx context.Context, tenantID, code, name, descript
 	return value, nil
 }
 
-func (s *Service) UpdateRole(ctx context.Context, id, name, description, dataScope, status string, version int64) (Role, error) {
-	if id == "" || strings.TrimSpace(name) == "" || version < 1 || !validDataScope(dataScope) || (status != "active" && status != "disabled") {
+func (s *Service) UpdateRole(ctx context.Context, tenantID, id, name, description, dataScope, status string, version int64) (Role, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" || id == "" || strings.TrimSpace(name) == "" || version < 1 || !validDataScope(dataScope) || (status != "active" && status != "disabled") {
 		return Role{}, apperror.Invalid("invalid role update", nil)
 	}
-	current, err := s.repository.GetRole(ctx, id)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Role{}, err
+	}
+	current, err := s.repository.GetRole(ctx, tenantID, id)
 	if err != nil {
 		return Role{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, current.TenantID); err != nil {
-		return Role{}, err
 	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
@@ -249,19 +250,19 @@ func (s *Service) UpdateRole(ctx context.Context, id, name, description, dataSco
 	if err := s.mutate(ctx, current.TenantID, "", "unspecified", "role_updated", fields, func(tx *sqlx.Tx) error { return s.repository.UpdateRole(ctx, tx, value) }); err != nil {
 		return Role{}, err
 	}
-	return s.repository.GetRole(ctx, id)
+	return s.repository.GetRole(ctx, tenantID, id)
 }
-func (s *Service) GetRole(ctx context.Context, id string) (Role, error) {
-	id = strings.TrimSpace(id)
-	if id == "" {
+func (s *Service) GetRole(ctx context.Context, tenantID, id string) (Role, error) {
+	tenantID, id = strings.TrimSpace(tenantID), strings.TrimSpace(id)
+	if tenantID == "" || id == "" {
 		return Role{}, apperror.Invalid("role_id is required", nil)
 	}
-	value, err := s.repository.GetRole(ctx, id)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Role{}, err
+	}
+	value, err := s.repository.GetRole(ctx, tenantID, id)
 	if err != nil {
 		return Role{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
-		return Role{}, err
 	}
 	return value, nil
 }
@@ -327,11 +328,11 @@ func (s *Service) BatchGetRoles(ctx context.Context, tenantID string, ids []stri
 }
 
 func (s *Service) GrantRolePermission(ctx context.Context, tenantID, roleID, permissionID string) (RolePermission, error) {
-	role, err := s.repository.GetRole(ctx, roleID)
+	role, err := s.repository.GetRole(ctx, tenantID, roleID)
 	if err != nil {
 		return RolePermission{}, translate(err)
 	}
-	permission, err := s.repository.GetPermission(ctx, permissionID)
+	permission, err := s.repository.GetPermission(ctx, tenantID, permissionID)
 	if err != nil {
 		return RolePermission{}, translate(err)
 	}
@@ -341,7 +342,7 @@ func (s *Service) GrantRolePermission(ctx context.Context, tenantID, roleID, per
 	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
 		return RolePermission{}, err
 	}
-	existing, existingErr := s.repository.GetRolePermissionByPair(ctx, roleID, permissionID)
+	existing, existingErr := s.repository.GetRolePermissionByPair(ctx, tenantID, roleID, permissionID)
 	if existingErr == nil && existing.Status == "active" {
 		return existing, nil
 	}
@@ -362,16 +363,17 @@ func (s *Service) GrantRolePermission(ctx context.Context, tenantID, roleID, per
 	if err := s.mutate(ctx, tenantID, "", "unspecified", "role_permission_granted", fields, operation); err != nil {
 		return RolePermission{}, err
 	}
-	return s.repository.GetRolePermissionByPair(ctx, roleID, permissionID)
+	return s.repository.GetRolePermissionByPair(ctx, tenantID, roleID, permissionID)
 }
 
-func (s *Service) RevokeRolePermission(ctx context.Context, id string, version int64) (RolePermission, error) {
-	value, err := s.repository.GetRolePermission(ctx, id)
+func (s *Service) RevokeRolePermission(ctx context.Context, tenantID, id string, version int64) (RolePermission, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return RolePermission{}, err
+	}
+	value, err := s.repository.GetRolePermission(ctx, tenantID, id)
 	if err != nil {
 		return RolePermission{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
-		return RolePermission{}, err
 	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
@@ -382,31 +384,31 @@ func (s *Service) RevokeRolePermission(ctx context.Context, id string, version i
 	if err := s.mutate(ctx, value.TenantID, "", "unspecified", "role_permission_revoked", fields, func(tx *sqlx.Tx) error { return s.repository.UpdateRolePermission(ctx, tx, value) }); err != nil {
 		return RolePermission{}, err
 	}
-	return s.repository.GetRolePermission(ctx, id)
+	return s.repository.GetRolePermission(ctx, tenantID, id)
 }
-func (s *Service) ListRolePermissions(ctx context.Context, roleID string) ([]RolePermission, error) {
-	role, err := s.repository.GetRole(ctx, roleID)
+func (s *Service) ListRolePermissions(ctx context.Context, tenantID, roleID string) ([]RolePermission, error) {
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return nil, err
+	}
+	_, err := s.repository.GetRole(ctx, tenantID, roleID)
 	if err != nil {
 		return nil, translate(err)
 	}
-	if err := enforceInteractiveTenant(ctx, role.TenantID); err != nil {
-		return nil, err
-	}
-	values, err := s.repository.ListRolePermissions(ctx, roleID)
+	values, err := s.repository.ListRolePermissions(ctx, tenantID, roleID)
 	return values, translate(err)
 }
 
-func (s *Service) BatchGetRolePermissions(ctx context.Context, roleID string, permissionIDs []string) ([]RolePermission, error) {
-	roleID = strings.TrimSpace(roleID)
-	if roleID == "" {
+func (s *Service) BatchGetRolePermissions(ctx context.Context, tenantID, roleID string, permissionIDs []string) ([]RolePermission, error) {
+	tenantID, roleID = strings.TrimSpace(tenantID), strings.TrimSpace(roleID)
+	if tenantID == "" || roleID == "" {
 		return nil, apperror.Invalid("role_id is required", nil)
 	}
-	role, err := s.repository.GetRole(ctx, roleID)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return nil, err
+	}
+	_, err := s.repository.GetRole(ctx, tenantID, roleID)
 	if err != nil {
 		return nil, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, role.TenantID); err != nil {
-		return nil, err
 	}
 	unique := make([]string, 0, len(permissionIDs))
 	seen := make(map[string]struct{}, len(permissionIDs))
@@ -427,12 +429,12 @@ func (s *Service) BatchGetRolePermissions(ctx context.Context, roleID string, pe
 	if len(unique) > 100 {
 		return nil, apperror.Invalid("permission_ids must not contain more than 100 values", nil)
 	}
-	items, err := s.repository.BatchGetRolePermissions(ctx, roleID, unique)
+	items, err := s.repository.BatchGetRolePermissions(ctx, tenantID, roleID, unique)
 	return items, translate(err)
 }
 
 func (s *Service) CreateBinding(ctx context.Context, tenantID, subjectID, subjectType, roleID, organizationUnitID string) (Binding, error) {
-	role, err := s.repository.GetRole(ctx, roleID)
+	role, err := s.repository.GetRole(ctx, tenantID, roleID)
 	if err != nil {
 		return Binding{}, translate(err)
 	}
@@ -454,13 +456,13 @@ func (s *Service) CreateBinding(ctx context.Context, tenantID, subjectID, subjec
 	return value, nil
 }
 
-func (s *Service) RevokeBinding(ctx context.Context, id string, version int64) (Binding, error) {
-	value, err := s.repository.GetBinding(ctx, id)
+func (s *Service) RevokeBinding(ctx context.Context, tenantID, id string, version int64) (Binding, error) {
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Binding{}, err
+	}
+	value, err := s.repository.GetBinding(ctx, tenantID, id)
 	if err != nil {
 		return Binding{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
-		return Binding{}, err
 	}
 	actor, now, err := audit.UpdatedBy(ctx, s.now())
 	if err != nil {
@@ -471,20 +473,20 @@ func (s *Service) RevokeBinding(ctx context.Context, id string, version int64) (
 	if err := s.mutate(ctx, value.TenantID, value.SubjectID, value.SubjectType, "binding_revoked", fields, func(tx *sqlx.Tx) error { return s.repository.UpdateBinding(ctx, tx, value) }); err != nil {
 		return Binding{}, err
 	}
-	return s.repository.GetBinding(ctx, id)
+	return s.repository.GetBinding(ctx, tenantID, id)
 }
 
-func (s *Service) GetBinding(ctx context.Context, id string) (Binding, error) {
-	id = strings.TrimSpace(id)
-	if id == "" {
+func (s *Service) GetBinding(ctx context.Context, tenantID, id string) (Binding, error) {
+	tenantID, id = strings.TrimSpace(tenantID), strings.TrimSpace(id)
+	if tenantID == "" || id == "" {
 		return Binding{}, apperror.Invalid("binding_id is required", nil)
 	}
-	value, err := s.repository.GetBinding(ctx, id)
+	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Binding{}, err
+	}
+	value, err := s.repository.GetBinding(ctx, tenantID, id)
 	if err != nil {
 		return Binding{}, translate(err)
-	}
-	if err := enforceInteractiveTenant(ctx, value.TenantID); err != nil {
-		return Binding{}, err
 	}
 	return value, nil
 }

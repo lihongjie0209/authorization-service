@@ -323,8 +323,11 @@ definitions:
     properties:
       binding_id:
         type: string
+      tenant_id:
+        type: string
     required:
     - binding_id
+    - tenant_id
     type: object
   httptransport.GetMyBindingRequest:
     properties:
@@ -378,15 +381,21 @@ definitions:
     properties:
       permission_id:
         type: string
+      tenant_id:
+        type: string
     required:
     - permission_id
+    - tenant_id
     type: object
   httptransport.GetRoleRequest:
     properties:
       role_id:
         type: string
+      tenant_id:
+        type: string
     required:
     - role_id
+    - tenant_id
     type: object
   httptransport.GrantMyRolePermissionRequest:
     properties:
@@ -545,8 +554,11 @@ definitions:
     properties:
       role_id:
         type: string
+      tenant_id:
+        type: string
     required:
     - role_id
+    - tenant_id
     type: object
   httptransport.ListRolesRequest:
     properties:
@@ -629,10 +641,13 @@ definitions:
     properties:
       binding_id:
         type: string
+      tenant_id:
+        type: string
       version:
         type: integer
     required:
     - binding_id
+    - tenant_id
     - version
     type: object
   httptransport.RevokeMyBindingRequest:
@@ -677,10 +692,13 @@ definitions:
     properties:
       role_permission_id:
         type: string
+      tenant_id:
+        type: string
       version:
         type: integer
     required:
     - role_permission_id
+    - tenant_id
     - version
     type: object
   httptransport.RoleBatchBody:
@@ -827,12 +845,15 @@ definitions:
         type: string
       status:
         type: string
+      tenant_id:
+        type: string
       version:
         type: integer
     required:
     - name
     - permission_id
     - status
+    - tenant_id
     - version
     type: object
   httptransport.UpdateRoleRequest:
@@ -847,6 +868,8 @@ definitions:
         type: string
       status:
         type: string
+      tenant_id:
+        type: string
       version:
         type: integer
     required:
@@ -854,6 +877,7 @@ definitions:
     - name
     - role_id
     - status
+    - tenant_id
     - version
     type: object
 info:

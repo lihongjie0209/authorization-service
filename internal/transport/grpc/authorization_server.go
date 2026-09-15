@@ -58,14 +58,14 @@ func (s *authorizationServer) CreatePermission(ctx context.Context, request *aut
 	return &authorizationv1.CreatePermissionResponse{Permission: toProtoPermission(value)}, nil
 }
 func (s *authorizationServer) GetPermission(ctx context.Context, request *authorizationv1.GetPermissionRequest) (*authorizationv1.GetPermissionResponse, error) {
-	value, err := s.service.GetPermission(ctx, request.GetPermissionId())
+	value, err := s.service.GetPermission(ctx, request.GetTenantId(), request.GetPermissionId())
 	if err != nil {
 		return nil, grpcError(err)
 	}
 	return &authorizationv1.GetPermissionResponse{Permission: toProtoPermission(value)}, nil
 }
 func (s *authorizationServer) UpdatePermission(ctx context.Context, request *authorizationv1.UpdatePermissionRequest) (*authorizationv1.UpdatePermissionResponse, error) {
-	value, err := s.service.UpdatePermission(ctx, request.GetPermissionId(), request.GetName(), request.GetConditionExpression(), request.GetStatus(), request.GetExpectedVersion())
+	value, err := s.service.UpdatePermission(ctx, request.GetTenantId(), request.GetPermissionId(), request.GetName(), request.GetConditionExpression(), request.GetStatus(), request.GetExpectedVersion())
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -91,14 +91,14 @@ func (s *authorizationServer) CreateRole(ctx context.Context, request *authoriza
 	return &authorizationv1.CreateRoleResponse{Role: toProtoRole(value)}, nil
 }
 func (s *authorizationServer) GetRole(ctx context.Context, request *authorizationv1.GetRoleRequest) (*authorizationv1.GetRoleResponse, error) {
-	value, err := s.service.GetRole(ctx, request.GetRoleId())
+	value, err := s.service.GetRole(ctx, request.GetTenantId(), request.GetRoleId())
 	if err != nil {
 		return nil, grpcError(err)
 	}
 	return &authorizationv1.GetRoleResponse{Role: toProtoRole(value)}, nil
 }
 func (s *authorizationServer) UpdateRole(ctx context.Context, request *authorizationv1.UpdateRoleRequest) (*authorizationv1.UpdateRoleResponse, error) {
-	value, err := s.service.UpdateRole(ctx, request.GetRoleId(), request.GetName(), request.GetDescription(), request.GetDataScope(), request.GetStatus(), request.GetExpectedVersion())
+	value, err := s.service.UpdateRole(ctx, request.GetTenantId(), request.GetRoleId(), request.GetName(), request.GetDescription(), request.GetDataScope(), request.GetStatus(), request.GetExpectedVersion())
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -124,14 +124,14 @@ func (s *authorizationServer) GrantRolePermission(ctx context.Context, request *
 	return &authorizationv1.GrantRolePermissionResponse{RolePermission: toProtoRolePermission(value)}, nil
 }
 func (s *authorizationServer) RevokeRolePermission(ctx context.Context, request *authorizationv1.RevokeRolePermissionRequest) (*authorizationv1.RevokeRolePermissionResponse, error) {
-	value, err := s.service.RevokeRolePermission(ctx, request.GetRolePermissionId(), request.GetExpectedVersion())
+	value, err := s.service.RevokeRolePermission(ctx, request.GetTenantId(), request.GetRolePermissionId(), request.GetExpectedVersion())
 	if err != nil {
 		return nil, grpcError(err)
 	}
 	return &authorizationv1.RevokeRolePermissionResponse{RolePermission: toProtoRolePermission(value)}, nil
 }
 func (s *authorizationServer) ListRolePermissions(ctx context.Context, request *authorizationv1.ListRolePermissionsRequest) (*authorizationv1.ListRolePermissionsResponse, error) {
-	values, err := s.service.ListRolePermissions(ctx, request.GetRoleId())
+	values, err := s.service.ListRolePermissions(ctx, request.GetTenantId(), request.GetRoleId())
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -149,14 +149,14 @@ func (s *authorizationServer) CreateBinding(ctx context.Context, request *author
 	return &authorizationv1.CreateBindingResponse{Binding: toProtoBinding(value)}, nil
 }
 func (s *authorizationServer) GetBinding(ctx context.Context, request *authorizationv1.GetBindingRequest) (*authorizationv1.GetBindingResponse, error) {
-	value, err := s.service.GetBinding(ctx, request.GetBindingId())
+	value, err := s.service.GetBinding(ctx, request.GetTenantId(), request.GetBindingId())
 	if err != nil {
 		return nil, grpcError(err)
 	}
 	return &authorizationv1.GetBindingResponse{Binding: toProtoBinding(value)}, nil
 }
 func (s *authorizationServer) RevokeBinding(ctx context.Context, request *authorizationv1.RevokeBindingRequest) (*authorizationv1.RevokeBindingResponse, error) {
-	value, err := s.service.RevokeBinding(ctx, request.GetBindingId(), request.GetExpectedVersion())
+	value, err := s.service.RevokeBinding(ctx, request.GetTenantId(), request.GetBindingId(), request.GetExpectedVersion())
 	if err != nil {
 		return nil, grpcError(err)
 	}

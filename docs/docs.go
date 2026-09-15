@@ -2445,10 +2445,14 @@ const docTemplate = `{
         "httptransport.GetBindingRequest": {
             "type": "object",
             "required": [
-                "binding_id"
+                "binding_id",
+                "tenant_id"
             ],
             "properties": {
                 "binding_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2525,10 +2529,14 @@ const docTemplate = `{
         "httptransport.GetPermissionRequest": {
             "type": "object",
             "required": [
-                "permission_id"
+                "permission_id",
+                "tenant_id"
             ],
             "properties": {
                 "permission_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2536,10 +2544,14 @@ const docTemplate = `{
         "httptransport.GetRoleRequest": {
             "type": "object",
             "required": [
-                "role_id"
+                "role_id",
+                "tenant_id"
             ],
             "properties": {
                 "role_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2772,10 +2784,14 @@ const docTemplate = `{
         "httptransport.ListRolePermissionsRequest": {
             "type": "object",
             "required": [
-                "role_id"
+                "role_id",
+                "tenant_id"
             ],
             "properties": {
                 "role_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 }
             }
@@ -2902,10 +2918,14 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "binding_id",
+                "tenant_id",
                 "version"
             ],
             "properties": {
                 "binding_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {
@@ -2971,10 +2991,14 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "role_permission_id",
+                "tenant_id",
                 "version"
             ],
             "properties": {
                 "role_permission_id": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {
@@ -3186,6 +3210,7 @@ const docTemplate = `{
                 "name",
                 "permission_id",
                 "status",
+                "tenant_id",
                 "version"
             ],
             "properties": {
@@ -3201,6 +3226,9 @@ const docTemplate = `{
                 "status": {
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "version": {
                     "type": "integer"
                 }
@@ -3213,6 +3241,7 @@ const docTemplate = `{
                 "name",
                 "role_id",
                 "status",
+                "tenant_id",
                 "version"
             ],
             "properties": {
@@ -3229,6 +3258,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
                     "type": "string"
                 },
                 "version": {
