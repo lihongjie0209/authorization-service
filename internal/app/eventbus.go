@@ -11,7 +11,9 @@ import (
 	authorizationdomain "github.com/lihongjie0209/authorization-service/internal/authorization"
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
+	"github.com/lihongjie0209/microservice-platform-go/operationlog"
 	platformoutbox "github.com/lihongjie0209/microservice-platform-go/outbox"
+	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
 	"go.uber.org/fx"
 )
 
@@ -113,6 +115,17 @@ func (r *eventRuntime) stop(context.Context) error {
 	return nil
 }
 
+func (r *eventRuntime) Publish(ctx context.Context, subject string, envelope *commonv1.EventEnvelope) error {
+	if r == nil || r.bus == nil {
+		return errors.New("authorization event bus is unavailable")
+	}
+	return r.bus.Publish(ctx, subject, envelope)
+}
+
+func newOperationLogRecorder(cfg config.Config, publisher *eventRuntime) (operationlog.Recorder, error) {
+	return operationlog.New(operationlog.Config{Enabled: cfg.OperationLog.Enabled, Subject: cfg.OperationLog.Subject, MaxPayloadBytes: cfg.OperationLog.MaxPayloadBytes}, publisher)
+}
+
 func newAuthorizationOutboxStore(db *sqlx.DB) (*platformoutbox.SQLStore, error) {
 	if db == nil {
 		return nil, nil
@@ -120,4 +133,4 @@ func newAuthorizationOutboxStore(db *sqlx.DB) (*platformoutbox.SQLStore, error) 
 	return platformoutbox.NewSQLStore(db, "authorization_outbox_events")
 }
 
-var EventBusModule = fx.Module("event-bus", fx.Provide(newAuthorizationOutboxStore, newEventRuntime), fx.Invoke(func(*eventRuntime) {}))
+var EventBusModule = fx.Module("event-bus", fx.Provide(newAuthorizationOutboxStore, newEventRuntime, newOperationLogRecorder), fx.Invoke(func(*eventRuntime) {}))

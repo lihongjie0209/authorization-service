@@ -35,6 +35,7 @@ type Config struct {
 	User          User          `mapstructure:"user"`
 	Idempotency   Idempotency   `mapstructure:"idempotency"`
 	EventBus      EventBus      `mapstructure:"event_bus"`
+	OperationLog  OperationLog  `mapstructure:"operation_log"`
 	Outbound      Outbound      `mapstructure:"outbound"`
 }
 
@@ -209,6 +210,11 @@ type EventBus struct {
 	PublishedRetention time.Duration `mapstructure:"published_retention"`
 	CleanupInterval    time.Duration `mapstructure:"cleanup_interval"`
 	CleanupBatchSize   int           `mapstructure:"cleanup_batch_size"`
+}
+type OperationLog struct {
+	Enabled         bool   `mapstructure:"enabled"`
+	Subject         string `mapstructure:"subject"`
+	MaxPayloadBytes int    `mapstructure:"max_payload_bytes"`
 }
 type Outbound struct {
 	HTTP map[string]HTTPUpstream `mapstructure:"http"`
@@ -452,6 +458,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("event_bus.published_retention", "168h")
 	v.SetDefault("event_bus.cleanup_interval", "1h")
 	v.SetDefault("event_bus.cleanup_batch_size", 1000)
+	v.SetDefault("operation_log.enabled", false)
+	v.SetDefault("operation_log.subject", "platform.operation-log.recorded.v1")
+	v.SetDefault("operation_log.max_payload_bytes", 16384)
 	v.SetDefault("outbound.http", map[string]any{})
 	v.SetDefault("outbound.grpc", map[string]any{})
 }
@@ -586,6 +595,12 @@ func (c Config) Validate() error {
 	}
 	if c.EventBus.Enabled && (!c.Database.Enabled || len(c.EventBus.URLs) == 0 || c.EventBus.StreamName == "" || (c.EventBus.Storage != "file" && c.EventBus.Storage != "memory") || c.EventBus.MaxAge <= 0 || c.EventBus.DispatchInterval <= 0 || c.EventBus.DispatchBatchSize <= 0 || c.EventBus.DispatchLease <= 0 || c.EventBus.DispatchRetryDelay <= 0 || c.EventBus.PublishedRetention < c.EventBus.MaxAge || c.EventBus.CleanupInterval <= 0 || c.EventBus.CleanupBatchSize <= 0) {
 		return errors.New("enabled event_bus requires database, stream settings, positive dispatch/cleanup settings, and published retention at least max_age")
+	}
+	if c.OperationLog.Enabled && !c.EventBus.Enabled {
+		return errors.New("enabled operation_log requires event_bus")
+	}
+	if c.OperationLog.Enabled && (strings.TrimSpace(c.OperationLog.Subject) == "" || c.OperationLog.MaxPayloadBytes < 256 || c.OperationLog.MaxPayloadBytes > 1<<20) {
+		return errors.New("enabled operation_log requires subject and max_payload_bytes between 256 bytes and 1 MiB")
 	}
 	for name, upstream := range c.Outbound.HTTP {
 		if upstream.BaseURL == "" || upstream.Timeout <= 0 {

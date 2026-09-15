@@ -101,6 +101,9 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 	api.POST("/authorization/check", handler.CheckAuthorization)
 	api.POST("/authorization/batch-check", handler.BatchCheckAuthorization)
 	api.POST("/authorization/my-permissions/check", handler.CheckMyPermissionCodes)
+	api.POST("/route-policies/page", handler.PageRoutePolicies)
+	api.POST("/route-policies/get", handler.GetRoutePolicy)
+	api.POST("/route-policies/set", handler.SetRoutePolicy)
 	server := &http.Server{Addr: cfg.HTTP.Address, Handler: router, ReadTimeout: cfg.HTTP.ReadTimeout, WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout}
 	var listener net.Listener
 	policyContext, stopPolicies := context.WithCancel(context.Background())

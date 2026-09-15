@@ -61,7 +61,7 @@ func TestRepositoryAndMigrations(t *testing.T) {
 			t.Cleanup(func() { _ = db.Close() })
 			policyRepository := routepolicy.NewRepository(db, appdb.NewTransactor(db))
 			definitions, err := policyRepository.Load(ctx)
-			if err != nil || len(definitions) != 57 {
+			if err != nil || len(definitions) != 60 {
 				t.Fatalf("load bootstrap route policies count=%d err=%v", len(definitions), err)
 			}
 			versionRoute, err := platformpolicy.NewRoute("http", "post", "/api/v1/version", "authorization-service", "")

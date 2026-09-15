@@ -65,3 +65,7 @@ observability:
 authorization:
   enabled: true
   policy_refresh_interval: 30s
+event_bus:
+  enabled: true
+operation_log:
+  enabled: true

@@ -40,7 +40,7 @@ func New(cfg config.Config) *fx.App {
 		fx.Provide(idempotency.New),
 		authorizationdomain.Module,
 		fx.Provide(observability.NewMetrics),
-		fx.Provide(routepolicy.NewRepository, platformpolicy.NewCompiler, routepolicy.NewManager),
+		fx.Provide(routepolicy.NewRepository, platformpolicy.NewCompiler, routepolicy.NewManager, routepolicy.NewService),
 		outbound.Module,
 		scheduler.Module,
 		grpctransport.Module,

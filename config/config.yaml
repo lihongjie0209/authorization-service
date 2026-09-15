@@ -163,6 +163,11 @@ event_bus:
   cleanup_interval: 1h
   cleanup_batch_size: 1000
 
+operation_log:
+  enabled: false
+  subject: platform.operation-log.recorded.v1
+  max_payload_bytes: 16384
+
 # Named outbound clients. Put environment-specific endpoints and credentials in
 # config-{env}.yaml or APP_ variables.
 outbound:

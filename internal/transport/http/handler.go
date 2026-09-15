@@ -8,6 +8,7 @@ import (
 	authorizationdomain "github.com/lihongjie0209/authorization-service/internal/authorization"
 	"github.com/lihongjie0209/authorization-service/internal/buildinfo"
 	"github.com/lihongjie0209/authorization-service/internal/health"
+	"github.com/lihongjie0209/authorization-service/internal/routepolicy"
 )
 
 type Handler struct {
@@ -15,10 +16,11 @@ type Handler struct {
 	health *health.Service
 
 	authorization *authorizationdomain.Service
+	routePolicies *routepolicy.Service
 }
 
-func NewHandler(healthService *health.Service, authorizationService *authorizationdomain.Service, logger *slog.Logger) *Handler {
-	return &Handler{health: healthService, authorization: authorizationService, logger: logger}
+func NewHandler(healthService *health.Service, authorizationService *authorizationdomain.Service, routePolicies *routepolicy.Service, logger *slog.Logger) *Handler {
+	return &Handler{health: healthService, authorization: authorizationService, routePolicies: routePolicies, logger: logger}
 }
 
 type MeResponseBody struct {

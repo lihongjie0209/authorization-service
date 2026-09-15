@@ -1,6 +1,7 @@
 package routepolicy
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	appdb "github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/microservice-platform-go/authz"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	platformpolicy "github.com/lihongjie0209/microservice-platform-go/routepolicy"
 )
 
@@ -34,6 +36,19 @@ func TestRepositoryLoadsDenormalizedPermissionReferences(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestServiceRejectsInvalidExpressionBeforePersistence(t *testing.T) {
+	compiler, err := platformpolicy.NewCompiler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(nil, nil, compiler, nil, nil)
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "admin", Type: principal.TypeUser})
+	_, err = service.Set(ctx, SetInput{RouteID: "route-1", Expression: `permissions["missing"]`, Status: "active"})
+	if err == nil || !errors.Is(err, platformpolicy.ErrInvalid) {
+		t.Fatalf("error = %v, want invalid expression", err)
 	}
 }
 
