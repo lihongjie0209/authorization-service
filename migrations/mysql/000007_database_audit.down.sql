@@ -1,0 +1,15 @@
+DROP TRIGGER authorization_processed_events_audit_bd; DROP TRIGGER authorization_processed_events_audit_bu; DROP TRIGGER authorization_processed_events_audit_bi;
+DROP TRIGGER authorization_subject_groups_audit_bd; DROP TRIGGER authorization_subject_groups_audit_bu; DROP TRIGGER authorization_subject_groups_audit_bi;
+DROP TRIGGER authorization_policy_versions_audit_bd; DROP TRIGGER authorization_policy_versions_audit_bu; DROP TRIGGER authorization_policy_versions_audit_bi;
+DROP TRIGGER role_bindings_audit_bd; DROP TRIGGER role_bindings_audit_bu; DROP TRIGGER role_bindings_audit_bi;
+DROP TRIGGER role_permissions_audit_bd; DROP TRIGGER role_permissions_audit_bu; DROP TRIGGER role_permissions_audit_bi;
+DROP TRIGGER roles_audit_bd; DROP TRIGGER roles_audit_bu; DROP TRIGGER roles_audit_bi;
+DROP TRIGGER permissions_audit_bd; DROP TRIGGER permissions_audit_bu; DROP TRIGGER permissions_audit_bi;
+ALTER TABLE authorization_outbox_events DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE authorization_processed_events DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE authorization_subject_groups DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE authorization_policy_versions DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE role_bindings DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE role_permissions DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE roles DROP COLUMN deleted_by, DROP COLUMN deleted_at;
+ALTER TABLE permissions DROP COLUMN deleted_by, DROP COLUMN deleted_at;

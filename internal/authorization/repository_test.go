@@ -20,11 +20,11 @@ func TestSQLRepositoryResolveIncludesWildcardPermissions(t *testing.T) {
 	db := sqlx.NewDb(database, "postgres")
 	repository := &SQLRepository{db: db}
 
-	grantQuery := db.Rebind("SELECT r.data_scope, COALESCE(rb.organization_unit_id, '') AS organization_unit_id, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id JOIN role_permissions rp ON rp.role_id = r.id JOIN permissions p ON p.id = rp.permission_id WHERE rb.tenant_id = ? AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active'))) AND (p.resource_type = ? OR p.resource_type = '*') AND (p.action = ? OR p.action = '*') AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'")
+	grantQuery := db.Rebind("SELECT r.data_scope, COALESCE(rb.organization_unit_id, '') AS organization_unit_id, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id AND r.deleted_at IS NULL JOIN role_permissions rp ON rp.role_id = r.id AND rp.deleted_at IS NULL JOIN permissions p ON p.id = rp.permission_id AND p.deleted_at IS NULL WHERE rb.tenant_id = ? AND rb.deleted_at IS NULL AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active' AND sg.deleted_at IS NULL))) AND (p.resource_type = ? OR p.resource_type = '*') AND (p.action = ? OR p.action = '*') AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'")
 	mock.ExpectQuery(regexp.QuoteMeta(grantQuery)).
 		WithArgs("__platform__", "user-1", "user", "user", "user-1", "identity.user", "list").
 		WillReturnRows(sqlmock.NewRows([]string{"data_scope", "organization_unit_id", "condition_expression"}).AddRow("all", "", ""))
-	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"))).
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ? AND deleted_at IS NULL"))).
 		WithArgs("__platform__").WillReturnRows(sqlmock.NewRows([]string{"policy_version"}).AddRow(1))
 
 	grants, version, err := repository.Resolve(t.Context(), "__platform__", "user-1", "user", "identity.user", "list")
@@ -49,7 +49,7 @@ func TestSQLRepositoryListPermissionCatalogScopesSearchAndActiveStatus(t *testin
 	db := sqlx.NewDb(database, "postgres")
 	repository := &SQLRepository{db: db}
 	pattern := "%invoice%"
-	where := "tenant_id = ? AND status = 'active' AND (? = '%%' OR LOWER(code) LIKE ? OR LOWER(name) LIKE ? OR LOWER(resource_type) LIKE ? OR LOWER(action) LIKE ?)"
+	where := "tenant_id = ? AND deleted_at IS NULL AND status = 'active' AND (? = '%%' OR LOWER(code) LIKE ? OR LOWER(name) LIKE ? OR LOWER(resource_type) LIKE ? OR LOWER(action) LIKE ?)"
 	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM permissions WHERE "+where))).
 		WithArgs("tenant-1", pattern, pattern, pattern, pattern, pattern).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
@@ -78,7 +78,7 @@ func TestSQLRepositorySearchAndBatchRolesRemainTenantScoped(t *testing.T) {
 	t.Cleanup(func() { _ = database.Close() })
 	db := sqlx.NewDb(database, "postgres")
 	repository := &SQLRepository{db: db}
-	where := " WHERE tenant_id = ? AND status = ? AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?))"
+	where := " WHERE tenant_id = ? AND deleted_at IS NULL AND status = ? AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?))"
 	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM roles"+where))).
 		WithArgs("tenant-1", "active", "%oper%", "%oper%").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
@@ -90,7 +90,7 @@ func TestSQLRepositorySearchAndBatchRolesRemainTenantScoped(t *testing.T) {
 	if err != nil || total != 1 || len(items) != 1 {
 		t.Fatalf("SearchRoles() = (%+v, %d, %v)", items, total, err)
 	}
-	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND id IN (?, ?) ORDER BY id"))).
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND deleted_at IS NULL AND id IN (?, ?) ORDER BY id"))).
 		WithArgs("tenant-1", "role-1", "role-2").
 		WillReturnRows(sqlmock.NewRows(strings.Split(roleColumns, ", ")).AddRow("role-1", "tenant-1", "operator", "Operator", "", "tenant", "active", 1, now, now, "user-1", "user-1"))
 	items, err = repository.BatchGetRoles(t.Context(), "tenant-1", []string{"role-1", "role-2"})
@@ -111,7 +111,7 @@ func TestSQLRepositoryBatchGetRolePermissionsFiltersRoleAndPermissions(t *testin
 	t.Cleanup(func() { _ = database.Close() })
 	db := sqlx.NewDb(database, "postgres")
 	repository := &SQLRepository{db: db}
-	query := db.Rebind("SELECT " + rolePermissionColumns + " FROM role_permissions WHERE role_id = ? AND permission_id IN (?, ?) ORDER BY id")
+	query := db.Rebind("SELECT " + rolePermissionColumns + " FROM role_permissions WHERE role_id = ? AND deleted_at IS NULL AND permission_id IN (?, ?) ORDER BY id")
 	now := time.Now()
 	mock.ExpectQuery(regexp.QuoteMeta(query)).
 		WithArgs("role-1", "permission-1", "permission-2").
@@ -174,7 +174,7 @@ func TestSQLRepositoryResolvePermissionCodesUsesSingleGrantQuery(t *testing.T) {
 	mock.ExpectQuery("SELECT DISTINCT p\\.code").
 		WithArgs("tenant-1", "membership-1", "membership", "membership", "membership-1", "application.read", "application.update").
 		WillReturnRows(sqlmock.NewRows([]string{"code", "resource_type", "action", "condition_expression"}).AddRow("application.read", "application", "read", ""))
-	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"))).
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ? AND deleted_at IS NULL"))).
 		WithArgs("tenant-1").WillReturnRows(sqlmock.NewRows([]string{"policy_version"}).AddRow(3))
 
 	grants, version, err := repository.ResolvePermissionCodes(t.Context(), "tenant-1", "membership-1", "membership", []string{"application.read", "application.update"})

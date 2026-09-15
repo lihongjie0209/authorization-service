@@ -77,10 +77,10 @@ func (r *SQLRepository) CreatePermission(ctx context.Context, exec sqlx.ExtConte
 func (r *SQLRepository) ListPermissions(ctx context.Context, tenantID string, limit, offset int) ([]Permission, int64, error) {
 	items := make([]Permission, 0)
 	var total int64
-	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM permissions WHERE tenant_id = ?"), tenantID); err != nil {
+	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM permissions WHERE tenant_id = ? AND deleted_at IS NULL"), tenantID); err != nil {
 		return nil, 0, fmt.Errorf("count permissions: %w", err)
 	}
-	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE tenant_id = ? ORDER BY code, id LIMIT ? OFFSET ?"), tenantID, limit, offset); err != nil {
+	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY code, id LIMIT ? OFFSET ?"), tenantID, limit, offset); err != nil {
 		return nil, 0, fmt.Errorf("list permissions: %w", err)
 	}
 	return items, total, nil
@@ -89,7 +89,7 @@ func (r *SQLRepository) ListPermissions(ctx context.Context, tenantID string, li
 func (r *SQLRepository) ListPermissionCatalog(ctx context.Context, tenantID, search string, limit, offset int) ([]Permission, int64, error) {
 	items := make([]Permission, 0)
 	pattern := "%" + strings.ToLower(strings.TrimSpace(search)) + "%"
-	where := "tenant_id = ? AND status = 'active' AND (? = '%%' OR LOWER(code) LIKE ? OR LOWER(name) LIKE ? OR LOWER(resource_type) LIKE ? OR LOWER(action) LIKE ?)"
+	where := "tenant_id = ? AND deleted_at IS NULL AND status = 'active' AND (? = '%%' OR LOWER(code) LIKE ? OR LOWER(name) LIKE ? OR LOWER(resource_type) LIKE ? OR LOWER(action) LIKE ?)"
 	args := []any{tenantID, pattern, pattern, pattern, pattern, pattern}
 	var total int64
 	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM permissions WHERE "+where), args...); err != nil {
@@ -104,12 +104,12 @@ func (r *SQLRepository) ListPermissionCatalog(ctx context.Context, tenantID, sea
 
 func (r *SQLRepository) GetPermission(ctx context.Context, id string) (Permission, error) {
 	var value Permission
-	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE id = ?"), id)
+	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE id = ? AND deleted_at IS NULL"), id)
 	return value, mapNotFound(err, "select permission")
 }
 
 func (r *SQLRepository) UpdatePermission(ctx context.Context, exec sqlx.ExtContext, value Permission) error {
-	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE permissions SET name = ?, condition_expression = ?, status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?"), value.Name, value.ConditionExpression, value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
+	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE permissions SET name = ?, condition_expression = ?, status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ? AND deleted_at IS NULL"), value.Name, value.ConditionExpression, value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
 	return affected(result, err, "update permission")
 }
 
@@ -120,27 +120,27 @@ func (r *SQLRepository) CreateRole(ctx context.Context, exec sqlx.ExtContext, va
 }
 func (r *SQLRepository) GetRole(ctx context.Context, id string) (Role, error) {
 	var value Role
-	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+roleColumns+" FROM roles WHERE id = ?"), id)
+	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+roleColumns+" FROM roles WHERE id = ? AND deleted_at IS NULL"), id)
 	return value, mapNotFound(err, "select role")
 }
 func (r *SQLRepository) UpdateRole(ctx context.Context, exec sqlx.ExtContext, value Role) error {
-	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE roles SET name = ?, description = ?, data_scope = ?, status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?"), value.Name, value.Description, value.DataScope, value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
+	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE roles SET name = ?, description = ?, data_scope = ?, status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ? AND deleted_at IS NULL"), value.Name, value.Description, value.DataScope, value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
 	return affected(result, err, "update role")
 }
 func (r *SQLRepository) ListRoles(ctx context.Context, tenantID string, limit, offset int) ([]Role, int64, error) {
 	items := make([]Role, 0)
 	var total int64
-	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM roles WHERE tenant_id = ?"), tenantID); err != nil {
+	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM roles WHERE tenant_id = ? AND deleted_at IS NULL"), tenantID); err != nil {
 		return nil, 0, fmt.Errorf("count roles: %w", err)
 	}
-	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? ORDER BY code, id LIMIT ? OFFSET ?"), tenantID, limit, offset); err != nil {
+	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY code, id LIMIT ? OFFSET ?"), tenantID, limit, offset); err != nil {
 		return nil, 0, fmt.Errorf("list roles: %w", err)
 	}
 	return items, total, nil
 }
 
 func (r *SQLRepository) SearchRoles(ctx context.Context, tenantID, keyword, status string, limit, offset int) ([]Role, int64, error) {
-	where := " WHERE tenant_id = ?"
+	where := " WHERE tenant_id = ? AND deleted_at IS NULL"
 	args := []any{tenantID}
 	if status != "" {
 		where += " AND status = ?"
@@ -165,7 +165,7 @@ func (r *SQLRepository) SearchRoles(ctx context.Context, tenantID, keyword, stat
 }
 
 func (r *SQLRepository) BatchGetRoles(ctx context.Context, tenantID string, ids []string) ([]Role, error) {
-	query, args, err := sqlx.In("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND id IN (?) ORDER BY id", tenantID, ids)
+	query, args, err := sqlx.In("SELECT "+roleColumns+" FROM roles WHERE tenant_id = ? AND deleted_at IS NULL AND id IN (?) ORDER BY id", tenantID, ids)
 	if err != nil {
 		return nil, fmt.Errorf("build batch role query: %w", err)
 	}
@@ -183,26 +183,26 @@ func (r *SQLRepository) CreateRolePermission(ctx context.Context, exec sqlx.ExtC
 }
 func (r *SQLRepository) GetRolePermission(ctx context.Context, id string) (RolePermission, error) {
 	var value RolePermission
-	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE id = ?"), id)
+	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE id = ? AND deleted_at IS NULL"), id)
 	return value, mapNotFound(err, "select role permission")
 }
 func (r *SQLRepository) GetRolePermissionByPair(ctx context.Context, roleID, permissionID string) (RolePermission, error) {
 	var value RolePermission
-	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND permission_id = ?"), roleID, permissionID)
+	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND permission_id = ? AND deleted_at IS NULL"), roleID, permissionID)
 	return value, mapNotFound(err, "select role permission by pair")
 }
 func (r *SQLRepository) UpdateRolePermission(ctx context.Context, exec sqlx.ExtContext, value RolePermission) error {
-	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE role_permissions SET status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?"), value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
+	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE role_permissions SET status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ? AND deleted_at IS NULL"), value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
 	return affected(result, err, "update role permission")
 }
 func (r *SQLRepository) ListRolePermissions(ctx context.Context, roleID string) ([]RolePermission, error) {
 	items := make([]RolePermission, 0)
-	err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? ORDER BY created_at, id"), roleID)
+	err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND deleted_at IS NULL ORDER BY created_at, id"), roleID)
 	return items, wrap(err, "list role permissions")
 }
 
 func (r *SQLRepository) BatchGetRolePermissions(ctx context.Context, roleID string, permissionIDs []string) ([]RolePermission, error) {
-	query, args, err := sqlx.In("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND permission_id IN (?) ORDER BY id", roleID, permissionIDs)
+	query, args, err := sqlx.In("SELECT "+rolePermissionColumns+" FROM role_permissions WHERE role_id = ? AND deleted_at IS NULL AND permission_id IN (?) ORDER BY id", roleID, permissionIDs)
 	if err != nil {
 		return nil, fmt.Errorf("build batch role permission query: %w", err)
 	}
@@ -220,15 +220,15 @@ func (r *SQLRepository) CreateBinding(ctx context.Context, exec sqlx.ExtContext,
 }
 func (r *SQLRepository) GetBinding(ctx context.Context, id string) (Binding, error) {
 	var value Binding
-	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+bindingColumns+" FROM role_bindings WHERE id = ?"), id)
+	err := r.db.GetContext(ctx, &value, r.db.Rebind("SELECT "+bindingColumns+" FROM role_bindings WHERE id = ? AND deleted_at IS NULL"), id)
 	return value, mapNotFound(err, "select role binding")
 }
 func (r *SQLRepository) UpdateBinding(ctx context.Context, exec sqlx.ExtContext, value Binding) error {
-	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE role_bindings SET status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ?"), value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
+	result, err := exec.ExecContext(ctx, r.db.Rebind("UPDATE role_bindings SET status = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE id = ? AND version = ? AND deleted_at IS NULL"), value.Status, value.UpdatedAt, value.UpdatedBy, value.ID, value.Version)
 	return affected(result, err, "update role binding")
 }
 func (r *SQLRepository) ListBindings(ctx context.Context, tenantID, subjectID, subjectType string, limit, offset int) ([]Binding, int64, error) {
-	where := "tenant_id = ?"
+	where := "tenant_id = ? AND deleted_at IS NULL"
 	args := []any{tenantID}
 	if subjectID != "" {
 		where += " AND subject_id = ? AND subject_type = ?"
@@ -248,12 +248,12 @@ func (r *SQLRepository) ListBindings(ctx context.Context, tenantID, subjectID, s
 
 func (r *SQLRepository) Resolve(ctx context.Context, tenantID, subjectID, subjectType, resourceType, action string) ([]resolvedGrant, uint64, error) {
 	grants := make([]resolvedGrant, 0)
-	query := r.db.Rebind("SELECT r.data_scope, COALESCE(rb.organization_unit_id, '') AS organization_unit_id, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id JOIN role_permissions rp ON rp.role_id = r.id JOIN permissions p ON p.id = rp.permission_id WHERE rb.tenant_id = ? AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active'))) AND (p.resource_type = ? OR p.resource_type = '*') AND (p.action = ? OR p.action = '*') AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'")
+	query := r.db.Rebind("SELECT r.data_scope, COALESCE(rb.organization_unit_id, '') AS organization_unit_id, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id AND r.deleted_at IS NULL JOIN role_permissions rp ON rp.role_id = r.id AND rp.deleted_at IS NULL JOIN permissions p ON p.id = rp.permission_id AND p.deleted_at IS NULL WHERE rb.tenant_id = ? AND rb.deleted_at IS NULL AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active' AND sg.deleted_at IS NULL))) AND (p.resource_type = ? OR p.resource_type = '*') AND (p.action = ? OR p.action = '*') AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'")
 	if err := r.db.SelectContext(ctx, &grants, query, tenantID, subjectID, subjectType, subjectType, subjectID, resourceType, action); err != nil {
 		return nil, 0, fmt.Errorf("resolve authorization grants: %w", err)
 	}
 	var version uint64
-	err := r.db.GetContext(ctx, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"), tenantID)
+	err := r.db.GetContext(ctx, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ? AND deleted_at IS NULL"), tenantID)
 	if errors.Is(err, sql.ErrNoRows) {
 		version = 0
 		err = nil
@@ -265,7 +265,7 @@ func (r *SQLRepository) Resolve(ctx context.Context, tenantID, subjectID, subjec
 }
 
 func (r *SQLRepository) ResolvePermissionCodes(ctx context.Context, tenantID, subjectID, subjectType string, codes []string) ([]resolvedPermissionCodeGrant, uint64, error) {
-	query, args, err := sqlx.In("SELECT DISTINCT p.code, p.resource_type, p.action, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id JOIN role_permissions rp ON rp.role_id = r.id JOIN permissions p ON p.id = rp.permission_id WHERE rb.tenant_id = ? AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active'))) AND (p.code IN (?) OR (p.resource_type = '*' AND p.action = '*')) AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'", tenantID, subjectID, subjectType, subjectType, subjectID, codes)
+	query, args, err := sqlx.In("SELECT DISTINCT p.code, p.resource_type, p.action, p.condition_expression FROM role_bindings rb JOIN roles r ON r.id = rb.role_id AND r.deleted_at IS NULL JOIN role_permissions rp ON rp.role_id = r.id AND rp.deleted_at IS NULL JOIN permissions p ON p.id = rp.permission_id AND p.deleted_at IS NULL WHERE rb.tenant_id = ? AND rb.deleted_at IS NULL AND ((rb.subject_id = ? AND rb.subject_type = ?) OR (? = 'membership' AND rb.subject_type = 'group' AND EXISTS (SELECT 1 FROM authorization_subject_groups sg WHERE sg.tenant_id = rb.tenant_id AND sg.membership_id = ? AND sg.group_id = rb.subject_id AND sg.status = 'active' AND sg.deleted_at IS NULL))) AND (p.code IN (?) OR (p.resource_type = '*' AND p.action = '*')) AND rb.status = 'active' AND r.status = 'active' AND rp.status = 'active' AND p.status = 'active'", tenantID, subjectID, subjectType, subjectType, subjectID, codes)
 	if err != nil {
 		return nil, 0, fmt.Errorf("build permission code query: %w", err)
 	}
@@ -274,7 +274,7 @@ func (r *SQLRepository) ResolvePermissionCodes(ctx context.Context, tenantID, su
 		return nil, 0, fmt.Errorf("resolve permission code grants: %w", err)
 	}
 	var version uint64
-	err = r.db.GetContext(ctx, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"), tenantID)
+	err = r.db.GetContext(ctx, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ? AND deleted_at IS NULL"), tenantID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return grants, 0, nil
 	}

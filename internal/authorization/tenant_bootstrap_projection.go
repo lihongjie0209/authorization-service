@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
 	tenantv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/tenant/v1"
 )
@@ -43,15 +44,16 @@ func (p *TenantBootstrapProjection) Apply(ctx context.Context, envelope *commonv
 	if actor == "" {
 		actor = "tenant-bootstrap"
 	}
-	err := p.transactor.Within(ctx, nil, func(tx *sqlx.Tx) error {
-		inserted, err := markProcessedEvent(ctx, p.db, tx, envelope.GetEventId(), envelope.GetEventType(), now)
+	actorCtx := principal.SystemContext(ctx, actor)
+	err := p.transactor.Within(actorCtx, nil, func(tx *sqlx.Tx) error {
+		inserted, err := markProcessedEvent(actorCtx, p.db, tx, envelope.GetEventId(), envelope.GetEventType(), now)
 		if err != nil || !inserted {
 			return err
 		}
-		if err := p.repository.BootstrapTenantOwner(ctx, tx, tenantID, membershipID, now, actor); err != nil {
+		if err := p.repository.BootstrapTenantOwner(actorCtx, tx, tenantID, membershipID, now, actor); err != nil {
 			return err
 		}
-		_, err = p.repository.BumpPolicyVersion(ctx, tx, tenantID, now, actor)
+		_, err = p.repository.BumpPolicyVersion(actorCtx, tx, tenantID, now, actor)
 		return err
 	})
 	if err == nil {

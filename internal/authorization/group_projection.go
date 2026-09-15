@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
 	tenantv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/tenant/v1"
 )
@@ -58,15 +59,16 @@ func (p *GroupProjection) Apply(ctx context.Context, envelope *commonv1.EventEnv
 	if envelope.GetContext().GetActorId() != "" {
 		actor = envelope.GetContext().GetActorId()
 	}
-	err := p.transactor.Within(ctx, nil, func(tx *sqlx.Tx) error {
-		inserted, err := p.markProcessed(ctx, tx, envelope.GetEventId(), envelope.GetEventType(), occurredAt)
+	actorCtx := principal.SystemContext(ctx, actor)
+	err := p.transactor.Within(actorCtx, nil, func(tx *sqlx.Tx) error {
+		inserted, err := p.markProcessed(actorCtx, tx, envelope.GetEventId(), envelope.GetEventType(), occurredAt)
 		if err != nil || !inserted {
 			return err
 		}
-		if err := p.upsertMembershipGroup(ctx, tx, event.GetGroup().GetTenantId(), event.GetMembershipId(), event.GetGroup().GetId(), status, occurredAt, actor); err != nil {
+		if err := p.upsertMembershipGroup(actorCtx, tx, event.GetGroup().GetTenantId(), event.GetMembershipId(), event.GetGroup().GetId(), status, occurredAt, actor); err != nil {
 			return err
 		}
-		_, err = p.bumpPolicyVersion(ctx, tx, event.GetGroup().GetTenantId(), occurredAt)
+		_, err = p.bumpPolicyVersion(actorCtx, tx, event.GetGroup().GetTenantId(), occurredAt)
 		return err
 	})
 	if err == nil && p.service != nil {

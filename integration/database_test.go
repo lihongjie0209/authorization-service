@@ -10,9 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	appdb "github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/authorization-service/internal/migration"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -55,6 +57,30 @@ func TestRepositoryAndMigrations(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = db.Close() })
+			writeCtx := principal.WithContext(ctx, principal.Principal{ID: "integration-auditor", Type: principal.TypeSystem})
+			if err := appdb.NewTransactor(db).Within(writeCtx, nil, func(tx *sqlx.Tx) error {
+				_, err := tx.ExecContext(writeCtx, db.Rebind(`INSERT INTO permissions(id,tenant_id,code,name,resource_type,action,status,version,created_at,updated_at,created_by,updated_by,condition_expression) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`), "permission-audit", "tenant-1", "audit.test", "Audit test", "audit", "read", "active", 99, time.Unix(1, 0), time.Unix(1, 0), "spoofed", "spoofed", "")
+				return err
+			}); err != nil {
+				t.Fatalf("insert audited permission: %v", err)
+			}
+			var audited struct {
+				CreatedBy string `db:"created_by"`
+				UpdatedBy string `db:"updated_by"`
+				Version   int64  `db:"version"`
+			}
+			if err := db.GetContext(ctx, &audited, db.Rebind(`SELECT created_by,updated_by,version FROM permissions WHERE id=?`), "permission-audit"); err != nil {
+				t.Fatal(err)
+			}
+			if audited.CreatedBy != "integration-auditor" || audited.UpdatedBy != "integration-auditor" || audited.Version != 1 {
+				t.Fatalf("database-owned audit fields = %+v", audited)
+			}
+			if err := appdb.NewTransactor(db).Within(writeCtx, nil, func(tx *sqlx.Tx) error {
+				_, err := tx.ExecContext(writeCtx, db.Rebind(`DELETE FROM permissions WHERE id=?`), "permission-audit")
+				return err
+			}); err == nil {
+				t.Fatal("physical delete unexpectedly succeeded")
+			}
 			var count int
 			if databaseType == "postgres" {
 				var timezone string
