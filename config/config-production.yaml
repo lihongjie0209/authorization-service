@@ -64,3 +64,4 @@ observability:
   tracing_enabled: false
 authorization:
   enabled: true
+  policy_refresh_interval: 30s

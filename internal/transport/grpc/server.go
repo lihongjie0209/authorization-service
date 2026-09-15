@@ -21,10 +21,12 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/idempotency"
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	appPolicy "github.com/lihongjie0209/authorization-service/internal/routepolicy"
 
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	platformidempotency "github.com/lihongjie0209/microservice-platform-go/idempotency"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	platformpolicy "github.com/lihongjie0209/microservice-platform-go/routepolicy"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
@@ -44,12 +46,12 @@ type Server struct {
 	logger  *slog.Logger
 }
 
-func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, authorizer platformauthz.Authorizer, healthService *apphealth.Service, authorizationService *authorizationdomain.Service, idempotencyManager *idempotency.Manager, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
+func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, authorizer platformauthz.Authorizer, policies *appPolicy.Manager, policyRepository *appPolicy.Repository, healthService *apphealth.Service, authorizationService *authorizationdomain.Service, idempotencyManager *idempotency.Manager, metrics *observability.Metrics, logger *slog.Logger) (*Server, error) {
 	options := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(cfg.GRPC.MaxReceiveBytes),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(environmentInterceptor(cfg.Runtime.ActiveProfile), requestIDInterceptor, idempotencyInterceptor, recoveryInterceptor(logger), authInterceptor(authService, cfg.Auth), platformauthz.UnaryServerInterceptor(authorizer, authorizationGRPCRequirement(cfg.Authorization.Enabled)), platformidempotency.UnaryServerInterceptor(idempotencyManager, cfg.Idempotency.GRPCMethods, logger), metricsInterceptor(metrics, logger)),
-		grpc.ChainStreamInterceptor(environmentStreamInterceptor(cfg.Runtime.ActiveProfile), requestIDStreamInterceptor, idempotencyStreamInterceptor, recoveryStreamInterceptor(logger), authStreamInterceptor(authService, cfg.Auth), metricsStreamInterceptor(metrics, logger)),
+		grpc.ChainUnaryInterceptor(environmentInterceptor(cfg.Runtime.ActiveProfile), requestIDInterceptor, idempotencyInterceptor, recoveryInterceptor(logger), authInterceptor(authService, cfg.Auth), databaseAuthorizationInterceptor(cfg.Authorization.Enabled, cfg.App.Name, policies, authorizer), platformidempotency.UnaryServerInterceptor(idempotencyManager, cfg.Idempotency.GRPCMethods, logger), metricsInterceptor(metrics, logger)),
+		grpc.ChainStreamInterceptor(environmentStreamInterceptor(cfg.Runtime.ActiveProfile), requestIDStreamInterceptor, idempotencyStreamInterceptor, recoveryStreamInterceptor(logger), authStreamInterceptor(authService, cfg.Auth), databaseAuthorizationStreamInterceptor(cfg.Authorization.Enabled, cfg.App.Name, policies, authorizer), metricsStreamInterceptor(metrics, logger)),
 	}
 	if cfg.GRPC.TLS.Enabled {
 		creds, err := serverCredentials(cfg.GRPC.TLS)
@@ -65,34 +67,72 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, authService *auth.Service, au
 		reflection.Register(grpcServer)
 	}
 	server := &Server{server: grpcServer, address: cfg.GRPC.Address, logger: logger}
-	lc.Append(fx.Hook{OnStart: server.start(cfg.GRPC.Enabled), OnStop: server.stop})
+	lc.Append(fx.Hook{OnStart: func(ctx context.Context) error {
+		if cfg.GRPC.Enabled && cfg.Authorization.Enabled {
+			routes, err := discoveredGRPCRoutes(grpcServer, cfg.App.Name)
+			if err != nil {
+				return err
+			}
+			if err := policyRepository.SyncRoutes(ctx, routes, cfg.App.Name+":route-discovery"); err != nil {
+				return fmt.Errorf("sync gRPC routes: %w", err)
+			}
+			if err := policies.RefreshSource(ctx, "startup-grpc"); err != nil {
+				return fmt.Errorf("load gRPC route policies: %w", err)
+			}
+		}
+		return server.start(cfg.GRPC.Enabled)(ctx)
+	}, OnStop: server.stop})
 	return server, nil
 }
 
-func authorizationGRPCRequirement(enabled bool) platformauthz.GRPCResolver {
-	return func(method string) (platformauthz.Requirement, bool) {
-		if !enabled {
-			return platformauthz.Requirement{}, false
+func discoveredGRPCRoutes(server *grpc.Server, serviceName string) ([]platformpolicy.Route, error) {
+	routes := []platformpolicy.Route{}
+	for service, info := range server.GetServiceInfo() {
+		if service == grpc_health_v1.Health_ServiceDesc.ServiceName {
+			continue
 		}
-		requirements := map[string]platformauthz.Requirement{
-			authorizationv1.AuthorizationService_GetPermission_FullMethodName:        {Resource: "authorization.permission", Action: "read", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_GetRole_FullMethodName:              {Resource: "authorization.role", Action: "read", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_CreatePermission_FullMethodName:     {Resource: "authorization.permission", Action: "create", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_UpdatePermission_FullMethodName:     {Resource: "authorization.permission", Action: "update", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_ListPermissions_FullMethodName:      {Resource: "authorization.permission", Action: "list", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_CreateRole_FullMethodName:           {Resource: "authorization.role", Action: "create", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_UpdateRole_FullMethodName:           {Resource: "authorization.role", Action: "update", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_ListRoles_FullMethodName:            {Resource: "authorization.role", Action: "list", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_GrantRolePermission_FullMethodName:  {Resource: "authorization.role-permission", Action: "grant", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_RevokeRolePermission_FullMethodName: {Resource: "authorization.role-permission", Action: "revoke", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_ListRolePermissions_FullMethodName:  {Resource: "authorization.role-permission", Action: "list", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_CreateBinding_FullMethodName:        {Resource: "authorization.binding", Action: "create", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_RevokeBinding_FullMethodName:        {Resource: "authorization.binding", Action: "revoke", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_GetBinding_FullMethodName:           {Resource: "authorization.binding", Action: "read", Scope: platformauthz.ScopePrincipal},
-			authorizationv1.AuthorizationService_ListBindings_FullMethodName:         {Resource: "authorization.binding", Action: "list", Scope: platformauthz.ScopePrincipal},
+		for _, method := range info.Methods {
+			path := "/" + service + "/" + method.Name
+			route, err := platformpolicy.NewRoute("grpc", "call", path, serviceName, "")
+			if err != nil {
+				return nil, err
+			}
+			route.Operation = path
+			routes = append(routes, route)
 		}
-		requirement, ok := requirements[method]
-		return requirement, ok
+	}
+	return routes, nil
+}
+
+type grpcRoutePolicyEvaluator interface {
+	EvaluateRoute(context.Context, string, string, string, string, platformauthz.Authorizer) error
+}
+
+func databaseAuthorizationInterceptor(enabled bool, serviceName string, policies grpcRoutePolicyEvaluator, authorizer platformauthz.Authorizer) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if enabled && !strings.HasPrefix(info.FullMethod, "/grpc.health.v1.Health/") && !strings.HasPrefix(info.FullMethod, "/grpc.reflection.") {
+			if err := policies.EvaluateRoute(ctx, "grpc", "call", info.FullMethod, serviceName, authorizer); err != nil {
+				if errors.Is(err, platformauthz.ErrDecisionUnavailable) || errors.Is(err, platformpolicy.ErrMissing) {
+					return nil, status.Error(codes.Unavailable, "authorization decision is unavailable")
+				}
+				return nil, status.Error(codes.PermissionDenied, "permission denied")
+			}
+		}
+		return handler(ctx, request)
+	}
+}
+
+func databaseAuthorizationStreamInterceptor(enabled bool, serviceName string, policies grpcRoutePolicyEvaluator, authorizer platformauthz.Authorizer) grpc.StreamServerInterceptor {
+	return func(server any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if enabled && !strings.HasPrefix(info.FullMethod, "/grpc.health.v1.Health/") && !strings.HasPrefix(info.FullMethod, "/grpc.reflection.") {
+			if err := policies.EvaluateRoute(stream.Context(), "grpc", "call", info.FullMethod, serviceName, authorizer); err != nil {
+				if errors.Is(err, platformauthz.ErrDecisionUnavailable) || errors.Is(err, platformpolicy.ErrMissing) {
+					return status.Error(codes.Unavailable, "authorization decision is unavailable")
+				}
+				return status.Error(codes.PermissionDenied, "permission denied")
+			}
+		}
+		return handler(server, stream)
 	}
 }
 

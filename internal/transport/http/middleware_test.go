@@ -107,20 +107,10 @@ func (a authorizationStub) Authorize(context.Context, principal.Principal, platf
 	return a.err
 }
 
-func TestAuthorizationHTTPRequirementCoversManagementAndExcludesDecisions(t *testing.T) {
-	t.Parallel()
-	protected := []string{"/api/v1/authorization/permissions/create", "/api/v1/authorization/permissions/get", "/api/v1/authorization/permissions/update", "/api/v1/authorization/permissions/list", "/api/v1/authorization/roles/create", "/api/v1/authorization/roles/get", "/api/v1/authorization/roles/update", "/api/v1/authorization/roles/list", "/api/v1/authorization/role-permissions/grant", "/api/v1/authorization/role-permissions/revoke", "/api/v1/authorization/role-permissions/list", "/api/v1/authorization/bindings/create", "/api/v1/authorization/bindings/get", "/api/v1/authorization/bindings/revoke", "/api/v1/authorization/bindings/list"}
-	for _, route := range protected {
-		requirement, ok := authorizationHTTPRequirement(route)
-		if !ok || requirement.Resource == "" || requirement.Action == "" || requirement.Scope != platformauthz.ScopePrincipal {
-			t.Fatalf("route %q requirement = %+v, %v", route, requirement, ok)
-		}
-	}
-	for _, route := range []string{"/api/v1/authorization/check", "/api/v1/authorization/batch-check", "/api/v1/authorization/my-permissions/check", "/api/v1/authorization/my-permission-catalog/list", "/api/v1/authorization/my-permissions/create", "/api/v1/authorization/my-permissions/get", "/api/v1/authorization/my-permissions/update", "/api/v1/authorization/my-permissions/list", "/api/v1/authorization/my-roles/create", "/api/v1/authorization/my-roles/get", "/api/v1/authorization/my-roles/update", "/api/v1/authorization/my-roles/list", "/api/v1/authorization/my-role-permissions/grant", "/api/v1/authorization/my-role-permissions/revoke", "/api/v1/authorization/my-role-permissions/list", "/api/v1/authorization/my-bindings/create", "/api/v1/authorization/my-bindings/get", "/api/v1/authorization/my-bindings/revoke", "/api/v1/authorization/my-bindings/list", "/api/v1/version", "/api/v1/me"} {
-		if _, ok := authorizationHTTPRequirement(route); ok {
-			t.Fatalf("decision/operational route %q must not recurse", route)
-		}
-	}
+type routePolicyStub struct{ err error }
+
+func (s routePolicyStub) EvaluateRoute(context.Context, string, string, string, string, platformauthz.Authorizer) error {
+	return s.err
 }
 
 func TestBindDecisionToCallerUsesTrustedTenantMembership(t *testing.T) {
@@ -185,7 +175,7 @@ func TestAuthorizationFailsClosedAndClassifiesOutage(t *testing.T) {
 			router.Use(RequestID(), func(c *gin.Context) {
 				c.Request = c.Request.WithContext(principal.WithContext(c.Request.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser}))
 				c.Next()
-			}, Authorization(true, authorizationStub{err: test.err}, slog.New(slog.NewTextHandler(io.Discard, nil))))
+			}, DatabaseAuthorization(true, "authorization-service", routePolicyStub{err: test.err}, authorizationStub{}, slog.New(slog.NewTextHandler(io.Discard, nil))))
 			router.POST("/api/v1/authorization/roles/list", func(c *gin.Context) { OK(c, nil) })
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/authorization/roles/list", nil))

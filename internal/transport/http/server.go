@@ -20,14 +20,16 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/idempotency"
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	"github.com/lihongjie0209/authorization-service/internal/ratelimit"
+	appPolicy "github.com/lihongjie0209/authorization-service/internal/routepolicy"
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
+	platformpolicy "github.com/lihongjie0209/microservice-platform-go/routepolicy"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/fx"
 )
 
-func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService *auth.Service, authorizer platformauthz.Authorizer, limiter *ratelimit.Limiter, idempotencyManager *idempotency.Manager, metrics *observability.Metrics, tracing *observability.Tracing, logger *slog.Logger) (*http.Server, error) {
+func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService *auth.Service, authorizer platformauthz.Authorizer, policies *appPolicy.Manager, policyRepository *appPolicy.Repository, limiter *ratelimit.Limiter, idempotencyManager *idempotency.Manager, metrics *observability.Metrics, tracing *observability.Tracing, logger *slog.Logger) (*http.Server, error) {
 	if cfg.App.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -55,7 +57,7 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 		}
 		swagger.GET("/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
-	api := router.Group("/api/v1", RateLimit(limiter, cfg.RateLimit.IP, "ip", func(c *gin.Context) string { return c.ClientIP() }, logger), RateLimit(limiter, cfg.RateLimit.API, "api", func(c *gin.Context) string { return c.FullPath() }, logger), Authentication(authService, logger, cfg.Auth), Authorization(cfg.Authorization.Enabled, authorizer, logger), RateLimit(limiter, cfg.RateLimit.User, "user", func(c *gin.Context) string {
+	api := router.Group("/api/v1", RateLimit(limiter, cfg.RateLimit.IP, "ip", func(c *gin.Context) string { return c.ClientIP() }, logger), RateLimit(limiter, cfg.RateLimit.API, "api", func(c *gin.Context) string { return c.FullPath() }, logger), Authentication(authService, logger, cfg.Auth), DatabaseAuthorization(cfg.Authorization.Enabled, cfg.App.Name, policies, authorizer, logger), RateLimit(limiter, cfg.RateLimit.User, "user", func(c *gin.Context) string {
 		value, _ := c.Get("subject")
 		subject, _ := value.(string)
 		return subject
@@ -101,7 +103,24 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 	api.POST("/authorization/my-permissions/check", handler.CheckMyPermissionCodes)
 	server := &http.Server{Addr: cfg.HTTP.Address, Handler: router, ReadTimeout: cfg.HTTP.ReadTimeout, WriteTimeout: cfg.HTTP.WriteTimeout, IdleTimeout: cfg.HTTP.IdleTimeout}
 	var listener net.Listener
-	lc.Append(fx.Hook{OnStart: func(context.Context) error {
+	policyContext, stopPolicies := context.WithCancel(context.Background())
+	lc.Append(fx.Hook{OnStart: func(ctx context.Context) error {
+		if cfg.Authorization.Enabled {
+			routes, err := discoveredBusinessRoutes(router, cfg.App.Name)
+			if err != nil {
+				return err
+			}
+			if err := policyRepository.SyncRoutes(ctx, routes, cfg.App.Name+":route-discovery"); err != nil {
+				return fmt.Errorf("sync HTTP routes: %w", err)
+			}
+			if err := policies.RefreshSource(ctx, "startup-http"); err != nil {
+				return fmt.Errorf("load route policies: %w", err)
+			}
+			if err := policies.ValidateRoutes(ctx, cfg.App.Name); err != nil {
+				logger.WarnContext(ctx, "route authorization policy coverage is incomplete; uncovered routes fail closed", "error", err)
+			}
+			go policies.Run(policyContext)
+		}
 		var err error
 		listener, err = net.Listen("tcp", server.Addr)
 		if err != nil {
@@ -114,8 +133,24 @@ func NewServer(lc fx.Lifecycle, cfg config.Config, handler *Handler, authService
 		}()
 		logger.Info("http server started", "address", server.Addr)
 		return nil
-	}, OnStop: func(ctx context.Context) error { return server.Shutdown(ctx) }})
+	}, OnStop: func(ctx context.Context) error { stopPolicies(); return server.Shutdown(ctx) }})
 	return server, nil
+}
+
+func discoveredBusinessRoutes(router *gin.Engine, serviceName string) ([]platformpolicy.Route, error) {
+	routes := []platformpolicy.Route{}
+	for _, info := range router.Routes() {
+		if !strings.HasPrefix(info.Path, "/api/v1/") {
+			continue
+		}
+		route, err := platformpolicy.NewRoute("http", info.Method, info.Path, serviceName, buildinfo.Version)
+		if err != nil {
+			return nil, fmt.Errorf("describe HTTP route %s: %w", info.Path, err)
+		}
+		route.Operation = info.Handler
+		routes = append(routes, route)
+	}
+	return routes, nil
 }
 
 func pprofAuth(expected string) gin.HandlerFunc {

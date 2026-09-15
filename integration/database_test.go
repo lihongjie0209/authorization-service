@@ -14,7 +14,9 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/config"
 	appdb "github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/authorization-service/internal/migration"
+	"github.com/lihongjie0209/authorization-service/internal/routepolicy"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	platformpolicy "github.com/lihongjie0209/microservice-platform-go/routepolicy"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/mysql"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -57,6 +59,23 @@ func TestRepositoryAndMigrations(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = db.Close() })
+			policyRepository := routepolicy.NewRepository(db, appdb.NewTransactor(db))
+			definitions, err := policyRepository.Load(ctx)
+			if err != nil || len(definitions) != 57 {
+				t.Fatalf("load bootstrap route policies count=%d err=%v", len(definitions), err)
+			}
+			versionRoute, err := platformpolicy.NewRoute("http", "post", "/api/v1/version", "authorization-service", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			versionPolicy, err := policyRepository.Get(ctx, versionRoute.ID)
+			if err != nil || versionPolicy.Expression != "anonymous || authenticated" {
+				t.Fatalf("version route policy=%+v err=%v", versionPolicy, err)
+			}
+			var bootstrapActor string
+			if err := db.GetContext(ctx, &bootstrapActor, db.Rebind(`SELECT created_by FROM route_policy_definitions WHERE id=?`), versionPolicy.PolicyID); err != nil || bootstrapActor != "authorization-service:migration" {
+				t.Fatalf("bootstrap actor=%q err=%v", bootstrapActor, err)
+			}
 			writeCtx := principal.WithContext(ctx, principal.Principal{ID: "integration-auditor", Type: principal.TypeSystem})
 			if err := appdb.NewTransactor(db).Within(writeCtx, nil, func(tx *sqlx.Tx) error {
 				_, err := tx.ExecContext(writeCtx, db.Rebind(`INSERT INTO permissions(id,tenant_id,code,name,resource_type,action,status,version,created_at,updated_at,created_by,updated_by,condition_expression) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`), "permission-audit", "tenant-1", "audit.test", "Audit test", "audit", "read", "active", 99, time.Unix(1, 0), time.Unix(1, 0), "spoofed", "spoofed", "")
