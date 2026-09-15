@@ -43,6 +43,7 @@ type Repository interface {
 	ResolvePermissionCodes(context.Context, string, string, string, []string) ([]resolvedPermissionCodeGrant, uint64, error)
 	BootstrapTenantOwner(context.Context, sqlx.ExtContext, string, string, time.Time, string) error
 	BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error)
+	PolicyVersion(context.Context, string) (uint64, error)
 	AddOutbox(context.Context, sqlx.ExtContext, OutboxEvent) error
 }
 
@@ -336,6 +337,17 @@ func (r *SQLRepository) BumpPolicyVersion(ctx context.Context, exec sqlx.ExtCont
 	var version uint64
 	if err := sqlx.GetContext(ctx, exec, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ?"), tenantID); err != nil {
 		return 0, fmt.Errorf("select bumped policy version: %w", err)
+	}
+	return version, nil
+}
+func (r *SQLRepository) PolicyVersion(ctx context.Context, tenantID string) (uint64, error) {
+	var version uint64
+	err := r.db.GetContext(ctx, &version, r.db.Rebind("SELECT policy_version FROM authorization_policy_versions WHERE tenant_id = ? AND deleted_at IS NULL"), tenantID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("select policy version: %w", err)
 	}
 	return version, nil
 }

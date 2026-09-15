@@ -208,6 +208,9 @@ func (*fakeRepository) BootstrapTenantOwner(context.Context, sqlx.ExtContext, st
 func (*fakeRepository) BumpPolicyVersion(context.Context, sqlx.ExtContext, string, time.Time, string) (uint64, error) {
 	return 1, nil
 }
+func (f *fakeRepository) PolicyVersion(context.Context, string) (uint64, error) {
+	return f.policyVersion, nil
+}
 func (*fakeRepository) AddOutbox(context.Context, sqlx.ExtContext, OutboxEvent) error { return nil }
 
 func TestService_CheckDeniesWithoutGrant(t *testing.T) {

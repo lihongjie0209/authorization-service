@@ -39,6 +39,7 @@ type Service struct {
 	cache      map[string]decisionCacheEntry
 	operations operationlog.Recorder
 	security   securitylog.Recorder
+	notify     func(context.Context, string, uint64)
 }
 
 type decisionCacheEntry struct {
@@ -651,6 +652,19 @@ func (s *Service) invalidateTenant(tenantID string) {
 	}
 }
 
+func (s *Service) cachedTenantVersions() map[string]uint64 {
+	versions := make(map[string]uint64)
+	s.cacheMu.RLock()
+	defer s.cacheMu.RUnlock()
+	for key, entry := range s.cache {
+		tenantID, _, _ := strings.Cut(key, "\x00")
+		if current, ok := versions[tenantID]; !ok || entry.decision.PolicyVersion > current {
+			versions[tenantID] = entry.decision.PolicyVersion
+		}
+	}
+	return versions
+}
+
 func decisionCacheKey(tenantID, subjectID, subjectType, resourceType, resourceID, action string, attributes map[string]string) string {
 	parts := []string{tenantID, subjectID, strings.ToLower(subjectType), strings.ToLower(resourceType), resourceID, strings.ToLower(action)}
 	keys := make([]string, 0, len(attributes))
@@ -689,6 +703,7 @@ func (s *Service) matchesCondition(expression, tenantID, subjectID, resourceID s
 
 func (s *Service) mutate(ctx context.Context, tenantID, subjectID, subjectType, reason string, fields audit.Fields, operation func(*sqlx.Tx) error) error {
 	started := time.Now()
+	var committedPolicyVersion uint64
 	err := s.transactor.Within(ctx, nil, func(tx *sqlx.Tx) error {
 		if err := operation(tx); err != nil {
 			return err
@@ -697,6 +712,7 @@ func (s *Service) mutate(ctx context.Context, tenantID, subjectID, subjectType, 
 		if err != nil {
 			return err
 		}
+		committedPolicyVersion = policyVersion
 		event := &authorizationv1.AuthorizationChangedEvent{TenantId: tenantID, SubjectId: subjectID, SubjectType: subjectTypeProto(subjectType), PolicyVersion: policyVersion, Reason: reason}
 		envelope, err := eventbus.NewEnvelope(eventbus.Metadata{EventID: uuid.NewString(), EventType: "platform.authorization.v1.AuthorizationChanged", AggregateID: tenantID, AggregateType: "authorization_policy", TenantID: tenantID, SchemaVersion: 1, ActorID: fields.UpdatedBy, OccurredAt: fields.UpdatedAt}, event)
 		if err != nil {
@@ -709,10 +725,13 @@ func (s *Service) mutate(ctx context.Context, tenantID, subjectID, subjectType, 
 		return s.repository.AddOutbox(ctx, tx, OutboxEvent{ID: envelope.GetEventId(), Subject: "platform.authorization.changed.v1", Envelope: encoded, AvailableAt: fields.UpdatedAt, AuditFields: auditFields(fields)})
 	})
 	err = translate(err)
+	var recordingErr error
 	if err == nil {
 		s.invalidateTenant(tenantID)
+		if s.notify != nil {
+			s.notify(ctx, tenantID, committedPolicyVersion)
+		}
 	}
-	var recordingErr error
 	if s.operations != nil && s.operations.Enabled() {
 		requestID, _ := requestid.FromContext(ctx)
 		entry := operationlog.Entry{Operation: "authorization." + reason, ResourceType: "authorization_policy", ResourceID: tenantID, Source: "authorization-service", Protocol: "internal", Request: map[string]any{"tenant_id": tenantID, "subject_id": subjectID, "subject_type": subjectType}, RequestID: requestID, Duration: time.Since(started), Succeeded: err == nil}
@@ -848,10 +867,11 @@ func authorizationUniqueViolation(err error) bool {
 }
 
 var Module = fx.Module("authorization",
-	fx.Provide(NewRepository, NewService, NewLocalAuthorizer, NewRuntimeGroupProjection, NewRuntimeTenantBootstrapProjection),
+	fx.Provide(NewRepository, NewService, NewLocalAuthorizer, NewRuntimeGroupProjection, NewRuntimeTenantBootstrapProjection, NewDecisionCacheRuntime),
 	fx.Decorate(func(service *Service, operations operationlog.Recorder, security securitylog.Recorder) *Service {
 		service.operations = operations
 		service.security = security
 		return service
 	}),
+	fx.Invoke(func(*DecisionCacheRuntime) {}),
 )

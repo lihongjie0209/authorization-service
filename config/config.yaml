@@ -97,6 +97,7 @@ auth:
 authorization:
   enabled: false
   policy_refresh_interval: 30s
+  decision_cache_ttl: 30s
 cron:
   enabled: true
   timezone: Asia/Shanghai

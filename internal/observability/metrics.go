@@ -25,6 +25,7 @@ type Metrics struct {
 	OutboundDuration           *prometheus.HistogramVec
 	RoutePolicyRefresh         *prometheus.CounterVec
 	RoutePolicyRefreshDuration *prometheus.HistogramVec
+	DecisionCacheInvalidation  *prometheus.CounterVec
 }
 
 func NewMetrics(cfg config.Config, db *sqlx.DB, client *redis.Client) *Metrics {
@@ -40,8 +41,9 @@ func NewMetrics(cfg config.Config, db *sqlx.DB, client *redis.Client) *Metrics {
 		OutboundDuration:           prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "outbound_request_duration_seconds", Help: "Outbound request latency.", Buckets: prometheus.DefBuckets}, []string{"protocol", "client"}),
 		RoutePolicyRefresh:         prometheus.NewCounterVec(prometheus.CounterOpts{Name: "route_policy_refresh_total", Help: "Total route policy snapshot refreshes."}, []string{"source", "status"}),
 		RoutePolicyRefreshDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "route_policy_refresh_duration_seconds", Help: "Route policy snapshot refresh latency.", Buckets: prometheus.DefBuckets}, []string{"source"}),
+		DecisionCacheInvalidation:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "authorization_decision_cache_invalidation_total", Help: "Authorization decision cache invalidations."}, []string{"source", "status"}),
 	}
-	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}), metrics.HTTPRequests, metrics.HTTPDuration, metrics.CronRuns, metrics.CronDuration, metrics.GRPCRequests, metrics.GRPCDuration, metrics.OutboundRequests, metrics.OutboundDuration, metrics.RoutePolicyRefresh, metrics.RoutePolicyRefreshDuration)
+	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}), metrics.HTTPRequests, metrics.HTTPDuration, metrics.CronRuns, metrics.CronDuration, metrics.GRPCRequests, metrics.GRPCDuration, metrics.OutboundRequests, metrics.OutboundDuration, metrics.RoutePolicyRefresh, metrics.RoutePolicyRefreshDuration, metrics.DecisionCacheInvalidation)
 	if db != nil {
 		registry.MustRegister(collectors.NewDBStatsCollector(db.DB, "primary"))
 	}
