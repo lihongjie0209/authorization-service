@@ -14,6 +14,7 @@ import (
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/operationlog"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	"github.com/lihongjie0209/microservice-platform-go/securitylog"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 )
 
@@ -40,9 +41,16 @@ type fakeRepository struct {
 }
 
 type recordingOperationLog struct{ entry operationlog.Entry }
+type recordingSecurityLog struct{ entry securitylog.Entry }
 
 func (*recordingOperationLog) Enabled() bool { return true }
 func (r *recordingOperationLog) Record(_ context.Context, entry operationlog.Entry) error {
+	r.entry = entry
+	return nil
+}
+func (*recordingSecurityLog) Enabled() bool    { return true }
+func (*recordingSecurityLog) FailClosed() bool { return true }
+func (r *recordingSecurityLog) Record(_ context.Context, entry securitylog.Entry) error {
 	r.entry = entry
 	return nil
 }
@@ -66,6 +74,31 @@ func TestMutationRecordsOperationAfterCommit(t *testing.T) {
 	}
 	if recorder.entry.Operation != "authorization.permission_created" || !recorder.entry.Succeeded || recorder.entry.ResourceID != "tenant-1" {
 		t.Fatalf("operation entry = %+v", recorder.entry)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMutationRecordsSecurityEventAfterCommit(t *testing.T) {
+	databaseHandle, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = databaseHandle.Close() })
+	db := sqlx.NewDb(databaseHandle, "postgres")
+	mock.ExpectBegin()
+	mock.ExpectExec("SELECT set_config").WithArgs("user-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	recorder := &recordingSecurityLog{}
+	service := NewService(&fakeRepository{}, database.NewTransactor(db))
+	service.security = recorder
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	if _, err := service.CreateRole(ctx, "tenant-1", "manager", "Manager", "Tenant manager", "tenant"); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.entry.EventType != securitylog.EventTenantAuthorization || recorder.entry.Reason != "role_created" || !recorder.entry.Succeeded || recorder.entry.TenantID != "tenant-1" {
+		t.Fatalf("security entry = %+v", recorder.entry)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

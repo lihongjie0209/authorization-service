@@ -13,6 +13,7 @@ import (
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
 	"github.com/lihongjie0209/microservice-platform-go/operationlog"
 	platformoutbox "github.com/lihongjie0209/microservice-platform-go/outbox"
+	"github.com/lihongjie0209/microservice-platform-go/securitylog"
 	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
 	"go.uber.org/fx"
 )
@@ -126,6 +127,10 @@ func newOperationLogRecorder(cfg config.Config, publisher *eventRuntime) (operat
 	return operationlog.New(operationlog.Config{Enabled: cfg.OperationLog.Enabled, Subject: cfg.OperationLog.Subject, MaxPayloadBytes: cfg.OperationLog.MaxPayloadBytes}, publisher)
 }
 
+func newSecurityLogRecorder(cfg config.Config, publisher *eventRuntime) (securitylog.Recorder, error) {
+	return securitylog.New(securitylog.Config{Enabled: cfg.SecurityLog.Enabled, Subject: cfg.SecurityLog.Subject, MaxPayloadBytes: cfg.SecurityLog.MaxPayloadBytes, HashKey: cfg.SecurityLog.HashKey, FailClosed: cfg.SecurityLog.FailClosed}, publisher)
+}
+
 func newAuthorizationOutboxStore(db *sqlx.DB) (*platformoutbox.SQLStore, error) {
 	if db == nil {
 		return nil, nil
@@ -133,4 +138,4 @@ func newAuthorizationOutboxStore(db *sqlx.DB) (*platformoutbox.SQLStore, error) 
 	return platformoutbox.NewSQLStore(db, "authorization_outbox_events")
 }
 
-var EventBusModule = fx.Module("event-bus", fx.Provide(newAuthorizationOutboxStore, newEventRuntime, newOperationLogRecorder), fx.Invoke(func(*eventRuntime) {}))
+var EventBusModule = fx.Module("event-bus", fx.Provide(newAuthorizationOutboxStore, newEventRuntime, newOperationLogRecorder, newSecurityLogRecorder), fx.Invoke(func(*eventRuntime) {}))

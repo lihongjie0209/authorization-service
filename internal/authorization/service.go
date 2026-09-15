@@ -17,11 +17,13 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	"github.com/lihongjie0209/authorization-service/internal/database"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	"github.com/lihongjie0209/authorization-service/internal/requestmeta"
 	"github.com/lihongjie0209/microservice-platform-go/audit"
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/eventbus"
 	"github.com/lihongjie0209/microservice-platform-go/operationlog"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
+	"github.com/lihongjie0209/microservice-platform-go/securitylog"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	"go.uber.org/fx"
 	"google.golang.org/protobuf/proto"
@@ -36,6 +38,7 @@ type Service struct {
 	cacheMu    sync.RWMutex
 	cache      map[string]decisionCacheEntry
 	operations operationlog.Recorder
+	security   securitylog.Recorder
 }
 
 type decisionCacheEntry struct {
@@ -709,6 +712,7 @@ func (s *Service) mutate(ctx context.Context, tenantID, subjectID, subjectType, 
 	if err == nil {
 		s.invalidateTenant(tenantID)
 	}
+	var recordingErr error
 	if s.operations != nil && s.operations.Enabled() {
 		requestID, _ := requestid.FromContext(ctx)
 		entry := operationlog.Entry{Operation: "authorization." + reason, ResourceType: "authorization_policy", ResourceID: tenantID, Source: "authorization-service", Protocol: "internal", Request: map[string]any{"tenant_id": tenantID, "subject_id": subjectID, "subject_type": subjectType}, RequestID: requestID, Duration: time.Since(started), Succeeded: err == nil}
@@ -718,8 +722,24 @@ func (s *Service) mutate(ctx context.Context, tenantID, subjectID, subjectType, 
 		persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 		defer cancel()
 		if recordErr := s.operations.Record(persistCtx, entry); recordErr != nil && err == nil {
-			return apperror.Unavailable("operation log unavailable", recordErr)
+			recordingErr = apperror.Unavailable("operation log unavailable", recordErr)
 		}
+	}
+	if s.security != nil && s.security.Enabled() {
+		requestID, _ := requestid.FromContext(ctx)
+		clientIP, userAgent := requestmeta.FromContext(ctx)
+		entry := securitylog.Entry{EventType: securitylog.EventTenantAuthorization, SubjectID: subjectID, SubjectType: subjectType, TenantID: tenantID, Succeeded: err == nil, Reason: reason, RequestID: requestID, ClientIP: clientIP, UserAgent: userAgent, Metadata: map[string]any{"policy_tenant_id": tenantID}}
+		if err != nil {
+			entry.ErrorMessage = err.Error()
+		}
+		persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
+		if recordErr := s.security.Record(persistCtx, entry); recordErr != nil && err == nil && s.security.FailClosed() {
+			recordingErr = apperror.Unavailable("security log unavailable", recordErr)
+		}
+	}
+	if recordingErr != nil {
+		return recordingErr
 	}
 	return err
 }
@@ -829,8 +849,9 @@ func authorizationUniqueViolation(err error) bool {
 
 var Module = fx.Module("authorization",
 	fx.Provide(NewRepository, NewService, NewLocalAuthorizer, NewRuntimeGroupProjection, NewRuntimeTenantBootstrapProjection),
-	fx.Decorate(func(service *Service, recorder operationlog.Recorder) *Service {
-		service.operations = recorder
+	fx.Decorate(func(service *Service, operations operationlog.Recorder, security securitylog.Recorder) *Service {
+		service.operations = operations
+		service.security = security
 		return service
 	}),
 )

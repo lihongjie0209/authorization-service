@@ -36,6 +36,7 @@ type Config struct {
 	Idempotency   Idempotency   `mapstructure:"idempotency"`
 	EventBus      EventBus      `mapstructure:"event_bus"`
 	OperationLog  OperationLog  `mapstructure:"operation_log"`
+	SecurityLog   SecurityLog   `mapstructure:"security_log"`
 	Outbound      Outbound      `mapstructure:"outbound"`
 }
 
@@ -215,6 +216,13 @@ type OperationLog struct {
 	Enabled         bool   `mapstructure:"enabled"`
 	Subject         string `mapstructure:"subject"`
 	MaxPayloadBytes int    `mapstructure:"max_payload_bytes"`
+}
+type SecurityLog struct {
+	Enabled         bool   `mapstructure:"enabled"`
+	Subject         string `mapstructure:"subject"`
+	MaxPayloadBytes int    `mapstructure:"max_payload_bytes"`
+	HashKey         string `mapstructure:"hash_key"`
+	FailClosed      bool   `mapstructure:"fail_closed"`
 }
 type Outbound struct {
 	HTTP map[string]HTTPUpstream `mapstructure:"http"`
@@ -461,6 +469,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("operation_log.enabled", false)
 	v.SetDefault("operation_log.subject", "platform.operation-log.recorded.v1")
 	v.SetDefault("operation_log.max_payload_bytes", 16384)
+	v.SetDefault("security_log.enabled", false)
+	v.SetDefault("security_log.subject", "platform.security-log.recorded.v1")
+	v.SetDefault("security_log.max_payload_bytes", 16384)
+	v.SetDefault("security_log.hash_key", "")
+	v.SetDefault("security_log.fail_closed", true)
 	v.SetDefault("outbound.http", map[string]any{})
 	v.SetDefault("outbound.grpc", map[string]any{})
 }
@@ -601,6 +614,12 @@ func (c Config) Validate() error {
 	}
 	if c.OperationLog.Enabled && (strings.TrimSpace(c.OperationLog.Subject) == "" || c.OperationLog.MaxPayloadBytes < 256 || c.OperationLog.MaxPayloadBytes > 1<<20) {
 		return errors.New("enabled operation_log requires subject and max_payload_bytes between 256 bytes and 1 MiB")
+	}
+	if c.SecurityLog.Enabled && !c.EventBus.Enabled {
+		return errors.New("enabled security_log requires event_bus")
+	}
+	if c.SecurityLog.Enabled && (strings.TrimSpace(c.SecurityLog.Subject) == "" || c.SecurityLog.MaxPayloadBytes < 256 || c.SecurityLog.MaxPayloadBytes > 1<<20 || len(c.SecurityLog.HashKey) < 32) {
+		return errors.New("enabled security_log requires subject, hash_key of at least 32 bytes, and max_payload_bytes between 256 bytes and 1 MiB")
 	}
 	for name, upstream := range c.Outbound.HTTP {
 		if upstream.BaseURL == "" || upstream.Timeout <= 0 {

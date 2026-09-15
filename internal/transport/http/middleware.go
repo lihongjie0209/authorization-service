@@ -25,6 +25,7 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	appLimit "github.com/lihongjie0209/authorization-service/internal/ratelimit"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	"github.com/lihongjie0209/authorization-service/internal/requestmeta"
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	platformpolicy "github.com/lihongjie0209/microservice-platform-go/routepolicy"
@@ -41,7 +42,8 @@ func RequestID() gin.HandlerFunc {
 		}
 		c.Set(requestIDKey, id)
 		c.Header("X-Request-ID", id)
-		c.Request = c.Request.WithContext(requestid.WithContext(c.Request.Context(), id))
+		ctx := requestid.WithContext(c.Request.Context(), id)
+		c.Request = c.Request.WithContext(requestmeta.WithContext(ctx, c.ClientIP(), c.Request.UserAgent()))
 		c.Next()
 	}
 }

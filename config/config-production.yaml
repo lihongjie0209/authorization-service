@@ -69,3 +69,5 @@ event_bus:
   enabled: true
 operation_log:
   enabled: true
+security_log:
+  enabled: true

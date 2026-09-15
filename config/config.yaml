@@ -168,6 +168,13 @@ operation_log:
   subject: platform.operation-log.recorded.v1
   max_payload_bytes: 16384
 
+security_log:
+  enabled: false
+  subject: platform.security-log.recorded.v1
+  max_payload_bytes: 16384
+  hash_key: ""
+  fail_closed: true
+
 # Named outbound clients. Put environment-specific endpoints and credentials in
 # config-{env}.yaml or APP_ variables.
 outbound:

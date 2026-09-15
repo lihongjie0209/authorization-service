@@ -21,6 +21,7 @@ import (
 	"github.com/lihongjie0209/authorization-service/internal/idempotency"
 	"github.com/lihongjie0209/authorization-service/internal/observability"
 	"github.com/lihongjie0209/authorization-service/internal/requestid"
+	"github.com/lihongjie0209/authorization-service/internal/requestmeta"
 	appPolicy "github.com/lihongjie0209/authorization-service/internal/routepolicy"
 
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
@@ -36,6 +37,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	grpc_health_v1 "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
@@ -213,7 +215,7 @@ func requestIDInterceptor(ctx context.Context, req any, info *grpc.UnaryServerIn
 	}
 	header := metadata.Pairs("x-request-id", id)
 	_ = grpc.SetHeader(ctx, header)
-	return handler(requestid.WithContext(ctx, id), req)
+	return handler(withRequestMetadata(requestid.WithContext(ctx, id)), req)
 }
 func idempotencyInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	values := metadata.ValueFromIncomingContext(ctx, "idempotency-key")
@@ -290,7 +292,22 @@ func requestIDStreamInterceptor(srv any, stream grpc.ServerStream, info *grpc.St
 	if err := stream.SetHeader(metadata.Pairs("x-request-id", id)); err != nil {
 		return status.Error(codes.Internal, "set request metadata")
 	}
-	return handler(srv, &contextServerStream{ServerStream: stream, ctx: requestid.WithContext(ctx, id)})
+	return handler(srv, &contextServerStream{ServerStream: stream, ctx: withRequestMetadata(requestid.WithContext(ctx, id))})
+}
+
+func withRequestMetadata(ctx context.Context) context.Context {
+	clientIP := ""
+	if remote, ok := peer.FromContext(ctx); ok && remote.Addr != nil {
+		clientIP = remote.Addr.String()
+		if host, _, err := net.SplitHostPort(clientIP); err == nil {
+			clientIP = host
+		}
+	}
+	userAgent := ""
+	if values := metadata.ValueFromIncomingContext(ctx, "user-agent"); len(values) > 0 {
+		userAgent = values[0]
+	}
+	return requestmeta.WithContext(ctx, clientIP, userAgent)
 }
 
 func idempotencyStreamInterceptor(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {

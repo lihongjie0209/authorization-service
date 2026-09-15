@@ -69,6 +69,8 @@ func TestConfigRejectsInvalidOutboxCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.EventBus.Enabled = true
+	cfg.Database.Enabled = true
+	cfg.Database.DSN = "postgres://test:test@localhost/platform"
 	for _, mutate := range []func(*EventBus){
 		func(eventBus *EventBus) { eventBus.PublishedRetention = eventBus.MaxAge - time.Second },
 		func(eventBus *EventBus) { eventBus.CleanupBatchSize = 0 },
@@ -78,6 +80,27 @@ func TestConfigRejectsInvalidOutboxCleanup(t *testing.T) {
 		if err := candidate.Validate(); err == nil {
 			t.Fatal("Validate() error = nil, want outbox cleanup validation error")
 		}
+	}
+}
+
+func TestConfigRejectsSecurityLogWithoutEventBusOrHashKey(t *testing.T) {
+	cfg, err := LoadWithProfile("../../config/config.yaml", "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.SecurityLog.Enabled = true
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "requires event_bus") {
+		t.Fatalf("Validate() error = %v, want event_bus dependency error", err)
+	}
+	cfg.EventBus.Enabled = true
+	cfg.Database.Enabled = true
+	cfg.Database.DSN = "postgres://test:test@localhost/platform"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "hash_key") {
+		t.Fatalf("Validate() error = %v, want hash_key error", err)
+	}
+	cfg.SecurityLog.HashKey = strings.Repeat("k", 32)
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
 	}
 }
 
