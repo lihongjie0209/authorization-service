@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
 	"github.com/lihongjie0209/authorization-service/internal/database"
 	platformauthz "github.com/lihongjie0209/microservice-platform-go/authz"
+	"github.com/lihongjie0209/microservice-platform-go/operationlog"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 )
@@ -35,6 +37,39 @@ type fakeRepository struct {
 	roleBatchTenant     string
 	roleBatchIDs        []string
 	binding             *Binding
+}
+
+type recordingOperationLog struct{ entry operationlog.Entry }
+
+func (*recordingOperationLog) Enabled() bool { return true }
+func (r *recordingOperationLog) Record(_ context.Context, entry operationlog.Entry) error {
+	r.entry = entry
+	return nil
+}
+
+func TestMutationRecordsOperationAfterCommit(t *testing.T) {
+	databaseHandle, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = databaseHandle.Close() })
+	db := sqlx.NewDb(databaseHandle, "postgres")
+	mock.ExpectBegin()
+	mock.ExpectExec("SELECT set_config").WithArgs("user-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	recorder := &recordingOperationLog{}
+	service := NewService(&fakeRepository{}, database.NewTransactor(db))
+	service.operations = recorder
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "user-1", Type: principal.TypeUser, TenantID: "tenant-1", MembershipID: "membership-1"})
+	if _, err := service.CreatePermission(ctx, "tenant-1", "invoice.read", "Read invoices", "invoice", "read"); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.entry.Operation != "authorization.permission_created" || !recorder.entry.Succeeded || recorder.entry.ResourceID != "tenant-1" {
+		t.Fatalf("operation entry = %+v", recorder.entry)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (*fakeRepository) CreatePermission(context.Context, sqlx.ExtContext, Permission) error {
