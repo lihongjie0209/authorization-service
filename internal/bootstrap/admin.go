@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	appdb "github.com/lihongjie0209/authorization-service/internal/database"
+	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
 const (
@@ -32,28 +34,22 @@ func GrantPlatformSuperAdmin(ctx context.Context, db *sqlx.DB, subjectID, subjec
 	if subjectID == "" || (subjectType != "user" && subjectType != "service_account") {
 		return Result{}, errors.New("a non-empty user or service-account subject is required")
 	}
-	tx, err := db.BeginTxx(ctx, nil)
-	if err != nil {
-		return Result{}, fmt.Errorf("begin bootstrap transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	var roleID string
-	query := db.Rebind("SELECT id FROM roles WHERE tenant_id = ? AND code = ? AND status = 'active'")
-	if err := tx.GetContext(ctx, &roleID, query, PlatformTenantID, SuperAdminRoleCode); err != nil {
-		return Result{}, fmt.Errorf("find platform super-admin role (run migrations first): %w", err)
-	}
 	now := time.Now()
 	actor := "platform-bootstrap:" + subjectID
-	bindingID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(PlatformTenantID+"\x00"+subjectType+"\x00"+subjectID+"\x00"+roleID)).String()
-	if err := upsertBinding(ctx, db, tx, bindingID, roleID, subjectID, subjectType, now, actor); err != nil {
+	actorCtx := principal.SystemContext(ctx, actor)
+	var roleID, bindingID string
+	if err := appdb.NewTransactor(db).Within(actorCtx, nil, func(tx *sqlx.Tx) error {
+		query := db.Rebind("SELECT id FROM roles WHERE tenant_id = ? AND code = ? AND status = 'active'")
+		if err := tx.GetContext(actorCtx, &roleID, query, PlatformTenantID, SuperAdminRoleCode); err != nil {
+			return fmt.Errorf("find platform super-admin role (run migrations first): %w", err)
+		}
+		bindingID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(PlatformTenantID+"\x00"+subjectType+"\x00"+subjectID+"\x00"+roleID)).String()
+		if err := upsertBinding(actorCtx, db, tx, bindingID, roleID, subjectID, subjectType, now, actor); err != nil {
+			return err
+		}
+		return bumpPolicyVersion(actorCtx, db, tx, now, actor)
+	}); err != nil {
 		return Result{}, err
-	}
-	if err := bumpPolicyVersion(ctx, db, tx, now, actor); err != nil {
-		return Result{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return Result{}, fmt.Errorf("commit bootstrap transaction: %w", err)
 	}
 	return Result{BindingID: bindingID, SubjectID: subjectID, SubjectType: subjectType, RoleID: roleID}, nil
 }

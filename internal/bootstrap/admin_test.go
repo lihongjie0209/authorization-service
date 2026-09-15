@@ -17,6 +17,9 @@ func TestGrantPlatformSuperAdminIsTransactionalAndIdempotent(t *testing.T) {
 	t.Cleanup(func() { _ = database.Close() })
 	db := sqlx.NewDb(database, "postgres")
 	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('app.actor_id', $1, true)")).
+		WithArgs("platform-bootstrap:user-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT id FROM roles WHERE tenant_id = ? AND code = ? AND status = 'active'"))).
 		WithArgs(PlatformTenantID, SuperAdminRoleCode).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("platform-super-admin-role"))
