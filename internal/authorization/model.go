@@ -53,6 +53,36 @@ type Binding struct {
 	AuditFields
 }
 
+type PermissionFilter struct {
+	Keyword       string
+	IDs           []string
+	Statuses      []string
+	ResourceTypes []string
+	Actions       []string
+	CreatedFrom   *time.Time
+	CreatedTo     *time.Time
+}
+
+type RoleFilter struct {
+	Keyword     string
+	IDs         []string
+	Statuses    []string
+	DataScopes  []string
+	CreatedFrom *time.Time
+	CreatedTo   *time.Time
+}
+
+type BindingFilter struct {
+	SubjectID           string
+	SubjectType         string
+	IDs                 []string
+	RoleIDs             []string
+	Statuses            []string
+	OrganizationUnitIDs []string
+	CreatedFrom         *time.Time
+	CreatedTo           *time.Time
+}
+
 type Decision struct {
 	Allowed             bool     `json:"allowed"`
 	DecisionID          string   `json:"decision_id"`

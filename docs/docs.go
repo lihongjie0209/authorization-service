@@ -2769,11 +2769,45 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "binding_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_from": {
+                    "type": "string"
+                },
+                "created_to": {
+                    "type": "string"
+                },
+                "organization_unit_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "page": {
                     "type": "integer"
                 },
                 "page_size": {
                     "type": "integer"
+                },
+                "role_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "statuses": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "subject_id": {
                     "type": "string"
@@ -2793,6 +2827,26 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "binding_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_from": {
+                    "type": "string"
+                },
+                "created_to": {
+                    "type": "string"
+                },
+                "organization_unit_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "page": {
                     "type": "integer"
                 },
@@ -2805,6 +2859,20 @@ const docTemplate = `{
                         "tenant",
                         "platform"
                     ]
+                },
+                "role_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "statuses": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "subject_id": {
                     "type": "string"
@@ -2853,11 +2921,35 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "actions": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_from": {
+                    "type": "string"
+                },
+                "created_to": {
+                    "type": "string"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 100
+                },
                 "page": {
                     "type": "integer"
                 },
                 "page_size": {
                     "type": "integer"
+                },
+                "permission_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "permission_scope": {
                     "type": "string",
@@ -2865,6 +2957,20 @@ const docTemplate = `{
                         "tenant",
                         "platform"
                     ]
+                },
+                "resource_types": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "statuses": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "tenant_id": {
                     "type": "string"
@@ -2901,6 +3007,19 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "created_from": {
+                    "type": "string"
+                },
+                "created_to": {
+                    "type": "string"
+                },
+                "data_scopes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "keyword": {
                     "type": "string"
                 },
@@ -2917,8 +3036,22 @@ const docTemplate = `{
                         "platform"
                     ]
                 },
+                "role_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "status": {
                     "type": "string"
+                },
+                "statuses": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "tenant_id": {
                     "type": "string"
@@ -2931,11 +3064,49 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "actions": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_from": {
+                    "type": "string"
+                },
+                "created_to": {
+                    "type": "string"
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 100
+                },
                 "page": {
                     "type": "integer"
                 },
                 "page_size": {
                     "type": "integer"
+                },
+                "permission_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resource_types": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "statuses": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "tenant_id": {
                     "type": "string"
@@ -2963,11 +3134,42 @@ const docTemplate = `{
                 "tenant_id"
             ],
             "properties": {
+                "created_from": {
+                    "type": "string"
+                },
+                "created_to": {
+                    "type": "string"
+                },
+                "data_scopes": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "keyword": {
+                    "type": "string",
+                    "maxLength": 100
+                },
                 "page": {
                     "type": "integer"
                 },
                 "page_size": {
                     "type": "integer"
+                },
+                "role_ids": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "statuses": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "tenant_id": {
                     "type": "string"

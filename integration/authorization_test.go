@@ -113,6 +113,19 @@ func TestAuthorizationDomainCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			createdFrom, createdTo := time.Now().Add(-time.Minute), time.Now().Add(time.Minute)
+			permissionPage, err := service.SearchPermissions(actorCtx, "tenant-1", authorizationdomain.PermissionFilter{Keyword: "invoice", IDs: []string{permission.ID}, Statuses: []string{"active"}, ResourceTypes: []string{"invoice"}, Actions: []string{"read"}, CreatedFrom: &createdFrom, CreatedTo: &createdTo}, 1, 20)
+			if err != nil || permissionPage.Total != 1 || len(permissionPage.Items) != 1 || permissionPage.Items[0].ID != permission.ID {
+				t.Fatalf("SearchPermissions() = (%+v, %v)", permissionPage, err)
+			}
+			filteredRoles, err := service.SearchRolesFiltered(actorCtx, "tenant-1", authorizationdomain.RoleFilter{Keyword: "audit", IDs: []string{role.ID}, Statuses: []string{"active"}, DataScopes: []string{"organization"}, CreatedFrom: &createdFrom, CreatedTo: &createdTo}, 1, 20)
+			if err != nil || filteredRoles.Total != 1 || len(filteredRoles.Items) != 1 || filteredRoles.Items[0].ID != role.ID {
+				t.Fatalf("SearchRolesFiltered() = (%+v, %v)", filteredRoles, err)
+			}
+			bindingPage, err := service.SearchBindings(actorCtx, "tenant-1", authorizationdomain.BindingFilter{SubjectID: "group-1", SubjectType: "group", IDs: []string{binding.ID}, RoleIDs: []string{role.ID}, Statuses: []string{"active"}, OrganizationUnitIDs: []string{"org-1"}, CreatedFrom: &createdFrom, CreatedTo: &createdTo}, 1, 20)
+			if err != nil || bindingPage.Total != 1 || len(bindingPage.Items) != 1 || bindingPage.Items[0].ID != binding.ID {
+				t.Fatalf("SearchBindings() = (%+v, %v)", bindingPage, err)
+			}
 
 			decision, err := service.Check(ctx, "tenant-1", "membership-1", "membership", "invoice", "read")
 			if err != nil || decision.Allowed || decision.PolicyVersion != 4 {

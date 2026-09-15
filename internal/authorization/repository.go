@@ -21,12 +21,14 @@ type Repository interface {
 	CreatePermission(context.Context, sqlx.ExtContext, Permission) error
 	UpdatePermission(context.Context, sqlx.ExtContext, Permission) error
 	ListPermissions(context.Context, string, int, int) ([]Permission, int64, error)
+	SearchPermissions(context.Context, string, PermissionFilter, int, int) ([]Permission, int64, error)
 	ListPermissionCatalog(context.Context, string, string, int, int) ([]Permission, int64, error)
 	CreateRole(context.Context, sqlx.ExtContext, Role) error
 	GetRole(context.Context, string, string) (Role, error)
 	UpdateRole(context.Context, sqlx.ExtContext, Role) error
 	ListRoles(context.Context, string, int, int) ([]Role, int64, error)
 	SearchRoles(context.Context, string, string, string, int, int) ([]Role, int64, error)
+	SearchRolesFiltered(context.Context, string, RoleFilter, int, int) ([]Role, int64, error)
 	BatchGetRoles(context.Context, string, []string) ([]Role, error)
 	GetPermission(context.Context, string, string) (Permission, error)
 	CreateRolePermission(context.Context, sqlx.ExtContext, RolePermission) error
@@ -39,6 +41,7 @@ type Repository interface {
 	GetBinding(context.Context, string, string) (Binding, error)
 	UpdateBinding(context.Context, sqlx.ExtContext, Binding) error
 	ListBindings(context.Context, string, string, string, int, int) ([]Binding, int64, error)
+	SearchBindings(context.Context, string, BindingFilter, int, int) ([]Binding, int64, error)
 	Resolve(context.Context, string, string, string, string, string) ([]resolvedGrant, uint64, error)
 	ResolvePermissionCodes(context.Context, string, string, string, []string) ([]resolvedPermissionCodeGrant, uint64, error)
 	BootstrapTenantOwner(context.Context, sqlx.ExtContext, string, string, time.Time, string) error
@@ -76,15 +79,67 @@ func (r *SQLRepository) CreatePermission(ctx context.Context, exec sqlx.ExtConte
 }
 
 func (r *SQLRepository) ListPermissions(ctx context.Context, tenantID string, limit, offset int) ([]Permission, int64, error) {
-	items := make([]Permission, 0)
-	var total int64
-	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM permissions WHERE tenant_id = ? AND deleted_at IS NULL"), tenantID); err != nil {
-		return nil, 0, fmt.Errorf("count permissions: %w", err)
+	return r.SearchPermissions(ctx, tenantID, PermissionFilter{}, limit, offset)
+}
+
+func (r *SQLRepository) SearchPermissions(ctx context.Context, tenantID string, filter PermissionFilter, limit, offset int) ([]Permission, int64, error) {
+	where := []string{"tenant_id = ?", "deleted_at IS NULL"}
+	args := []any{tenantID}
+	if filter.Keyword != "" {
+		where = append(where, "(LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(resource_type) LIKE LOWER(?) OR LOWER(action) LIKE LOWER(?))")
+		pattern := "%" + filter.Keyword + "%"
+		args = append(args, pattern, pattern, pattern, pattern)
 	}
-	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+permissionColumns+" FROM permissions WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY code, id LIMIT ? OFFSET ?"), tenantID, limit, offset); err != nil {
-		return nil, 0, fmt.Errorf("list permissions: %w", err)
+	where, args = appendSetFilters(where, args, []setFilter{{"id", filter.IDs}, {"status", filter.Statuses}, {"resource_type", filter.ResourceTypes}, {"action", filter.Actions}})
+	where, args = appendTimeRange(where, args, filter.CreatedFrom, filter.CreatedTo)
+	return listPage(ctx, r.db, "permissions", permissionColumns, strings.Join(where, " AND "), args, "code, id", limit, offset, []Permission{})
+}
+
+func listPage[T any](ctx context.Context, db *sqlx.DB, table, columns, where string, args []any, order string, limit, offset int, items []T) ([]T, int64, error) {
+	countQuery, countArgs, err := sqlx.In("SELECT COUNT(*) FROM "+table+" WHERE "+where, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("build %s count: %w", table, err)
+	}
+	var total int64
+	if err := db.GetContext(ctx, &total, db.Rebind(countQuery), countArgs...); err != nil {
+		return nil, 0, fmt.Errorf("count %s: %w", table, err)
+	}
+	queryArgs := append(append([]any(nil), args...), limit, offset)
+	query, queryArgs, err := sqlx.In("SELECT "+columns+" FROM "+table+" WHERE "+where+" ORDER BY "+order+" LIMIT ? OFFSET ?", queryArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("build %s list: %w", table, err)
+	}
+	if err := db.SelectContext(ctx, &items, db.Rebind(query), queryArgs...); err != nil {
+		return nil, 0, fmt.Errorf("list %s: %w", table, err)
 	}
 	return items, total, nil
+}
+
+type setFilter struct {
+	column string
+	values []string
+}
+
+func appendSetFilters(where []string, args []any, filters []setFilter) ([]string, []any) {
+	for _, filter := range filters {
+		if len(filter.values) > 0 {
+			where = append(where, filter.column+" IN (?)")
+			args = append(args, filter.values)
+		}
+	}
+	return where, args
+}
+
+func appendTimeRange(where []string, args []any, from, to *time.Time) ([]string, []any) {
+	if from != nil {
+		where = append(where, "created_at >= ?")
+		args = append(args, *from)
+	}
+	if to != nil {
+		where = append(where, "created_at < ?")
+		args = append(args, *to)
+	}
+	return where, args
 }
 
 func (r *SQLRepository) ListPermissionCatalog(ctx context.Context, tenantID, search string, limit, offset int) ([]Permission, int64, error) {
@@ -141,28 +196,25 @@ func (r *SQLRepository) ListRoles(ctx context.Context, tenantID string, limit, o
 }
 
 func (r *SQLRepository) SearchRoles(ctx context.Context, tenantID, keyword, status string, limit, offset int) ([]Role, int64, error) {
+	statuses := []string(nil)
+	if status != "" {
+		statuses = []string{status}
+	}
+	return r.SearchRolesFiltered(ctx, tenantID, RoleFilter{Keyword: keyword, Statuses: statuses}, limit, offset)
+}
+
+func (r *SQLRepository) SearchRolesFiltered(ctx context.Context, tenantID string, filter RoleFilter, limit, offset int) ([]Role, int64, error) {
 	where := " WHERE tenant_id = ? AND deleted_at IS NULL"
 	args := []any{tenantID}
-	if status != "" {
-		where += " AND status = ?"
-		args = append(args, status)
-	}
-	if keyword != "" {
+	if filter.Keyword != "" {
 		where += " AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?))"
-		pattern := "%" + keyword + "%"
+		pattern := "%" + filter.Keyword + "%"
 		args = append(args, pattern, pattern)
 	}
-	var total int64
-	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM roles"+where), args...); err != nil {
-		return nil, 0, fmt.Errorf("count searched roles: %w", err)
-	}
-	items := make([]Role, 0, limit)
-	queryArgs := append(append([]any(nil), args...), limit, offset)
-	query := "SELECT " + roleColumns + " FROM roles" + where + " ORDER BY code, id LIMIT ? OFFSET ?"
-	if err := r.db.SelectContext(ctx, &items, r.db.Rebind(query), queryArgs...); err != nil {
-		return nil, 0, fmt.Errorf("search roles: %w", err)
-	}
-	return items, total, nil
+	parts := strings.Split(strings.TrimPrefix(where, " WHERE "), " AND ")
+	parts, args = appendSetFilters(parts, args, []setFilter{{"id", filter.IDs}, {"status", filter.Statuses}, {"data_scope", filter.DataScopes}})
+	parts, args = appendTimeRange(parts, args, filter.CreatedFrom, filter.CreatedTo)
+	return listPage(ctx, r.db, "roles", roleColumns, strings.Join(parts, " AND "), args, "code, id", limit, offset, []Role{})
 }
 
 func (r *SQLRepository) BatchGetRoles(ctx context.Context, tenantID string, ids []string) ([]Role, error) {
@@ -229,22 +281,20 @@ func (r *SQLRepository) UpdateBinding(ctx context.Context, exec sqlx.ExtContext,
 	return affected(result, err, "update role binding")
 }
 func (r *SQLRepository) ListBindings(ctx context.Context, tenantID, subjectID, subjectType string, limit, offset int) ([]Binding, int64, error) {
+	return r.SearchBindings(ctx, tenantID, BindingFilter{SubjectID: subjectID, SubjectType: subjectType}, limit, offset)
+}
+
+func (r *SQLRepository) SearchBindings(ctx context.Context, tenantID string, filter BindingFilter, limit, offset int) ([]Binding, int64, error) {
 	where := "tenant_id = ? AND deleted_at IS NULL"
 	args := []any{tenantID}
-	if subjectID != "" {
+	if filter.SubjectID != "" {
 		where += " AND subject_id = ? AND subject_type = ?"
-		args = append(args, subjectID, subjectType)
+		args = append(args, filter.SubjectID, filter.SubjectType)
 	}
-	var total int64
-	if err := r.db.GetContext(ctx, &total, r.db.Rebind("SELECT COUNT(*) FROM role_bindings WHERE "+where), args...); err != nil {
-		return nil, 0, fmt.Errorf("count role bindings: %w", err)
-	}
-	items := make([]Binding, 0)
-	args = append(args, limit, offset)
-	if err := r.db.SelectContext(ctx, &items, r.db.Rebind("SELECT "+bindingColumns+" FROM role_bindings WHERE "+where+" ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"), args...); err != nil {
-		return nil, 0, fmt.Errorf("list role bindings: %w", err)
-	}
-	return items, total, nil
+	parts := strings.Split(where, " AND ")
+	parts, args = appendSetFilters(parts, args, []setFilter{{"id", filter.IDs}, {"role_id", filter.RoleIDs}, {"status", filter.Statuses}, {"organization_unit_id", filter.OrganizationUnitIDs}})
+	parts, args = appendTimeRange(parts, args, filter.CreatedFrom, filter.CreatedTo)
+	return listPage(ctx, r.db, "role_bindings", bindingColumns, strings.Join(parts, " AND "), args, "created_at DESC, id DESC", limit, offset, []Binding{})
 }
 
 func (r *SQLRepository) Resolve(ctx context.Context, tenantID, subjectID, subjectType, resourceType, action string) ([]resolvedGrant, uint64, error) {

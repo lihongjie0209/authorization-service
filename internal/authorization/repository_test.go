@@ -1,6 +1,7 @@
 package authorization
 
 import (
+	"database/sql/driver"
 	"regexp"
 	"strings"
 	"testing"
@@ -9,6 +10,14 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 )
+
+func driverValues(values []any) []driver.Value {
+	result := make([]driver.Value, len(values))
+	for index, value := range values {
+		result[index] = value
+	}
+	return result
+}
 
 func TestSQLRepositoryResolveIncludesWildcardPermissions(t *testing.T) {
 	t.Parallel()
@@ -69,6 +78,53 @@ func TestSQLRepositoryListPermissionCatalogScopesSearchAndActiveStatus(t *testin
 	}
 }
 
+func TestSQLRepositorySearchPermissionsAppliesTenantAndTypedFilters(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	from, to := time.Now().Add(-time.Hour), time.Now()
+	where := "tenant_id = ? AND deleted_at IS NULL AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(resource_type) LIKE LOWER(?) OR LOWER(action) LIKE LOWER(?)) AND id IN (?, ?) AND status IN (?) AND resource_type IN (?) AND action IN (?) AND created_at >= ? AND created_at < ?"
+	args := []any{"tenant-1", "%invoice%", "%invoice%", "%invoice%", "%invoice%", "p1", "p2", "active", "invoice", "read", from, to}
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM permissions WHERE " + where))).WithArgs(driverValues(args)...).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	listArgs := append(append([]any(nil), args...), 20, 0)
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT " + permissionColumns + " FROM permissions WHERE " + where + " ORDER BY code, id LIMIT ? OFFSET ?"))).WithArgs(driverValues(listArgs)...).WillReturnRows(sqlmock.NewRows(strings.Split(permissionColumns, ", ")))
+	_, _, err = repository.SearchPermissions(t.Context(), "tenant-1", PermissionFilter{Keyword: "invoice", IDs: []string{"p1", "p2"}, Statuses: []string{"active"}, ResourceTypes: []string{"invoice"}, Actions: []string{"read"}, CreatedFrom: &from, CreatedTo: &to}, 20, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSQLRepositorySearchBindingsKeepsSubjectAndTenantScope(t *testing.T) {
+	t.Parallel()
+	database, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	db := sqlx.NewDb(database, "postgres")
+	repository := &SQLRepository{db: db}
+	where := "tenant_id = ? AND deleted_at IS NULL AND subject_id = ? AND subject_type = ? AND id IN (?) AND role_id IN (?) AND status IN (?)"
+	args := []any{"tenant-1", "membership-1", "membership", "binding-1", "role-1", "active"}
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM role_bindings WHERE " + where))).WithArgs(driverValues(args)...).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	listArgs := append(append([]any(nil), args...), 20, 0)
+	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT " + bindingColumns + " FROM role_bindings WHERE " + where + " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"))).WithArgs(driverValues(listArgs)...).WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "subject_id", "subject_type", "role_id", "organization_unit_id", "status", "version", "created_at", "updated_at", "created_by", "updated_by"}))
+	_, _, err = repository.SearchBindings(t.Context(), "tenant-1", BindingFilter{SubjectID: "membership-1", SubjectType: "membership", IDs: []string{"binding-1"}, RoleIDs: []string{"role-1"}, Statuses: []string{"active"}}, 20, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSQLRepositorySearchAndBatchRolesRemainTenantScoped(t *testing.T) {
 	t.Parallel()
 	database, mock, err := sqlmock.New()
@@ -78,13 +134,13 @@ func TestSQLRepositorySearchAndBatchRolesRemainTenantScoped(t *testing.T) {
 	t.Cleanup(func() { _ = database.Close() })
 	db := sqlx.NewDb(database, "postgres")
 	repository := &SQLRepository{db: db}
-	where := " WHERE tenant_id = ? AND deleted_at IS NULL AND status = ? AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?))"
+	where := " WHERE tenant_id = ? AND deleted_at IS NULL AND (LOWER(code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?)) AND status IN (?)"
 	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT COUNT(*) FROM roles"+where))).
-		WithArgs("tenant-1", "active", "%oper%", "%oper%").
+		WithArgs("tenant-1", "%oper%", "%oper%", "active").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 	now := time.Now()
 	mock.ExpectQuery(regexp.QuoteMeta(db.Rebind("SELECT "+roleColumns+" FROM roles"+where+" ORDER BY code, id LIMIT ? OFFSET ?"))).
-		WithArgs("tenant-1", "active", "%oper%", "%oper%", 20, 0).
+		WithArgs("tenant-1", "%oper%", "%oper%", "active", 20, 0).
 		WillReturnRows(sqlmock.NewRows(strings.Split(roleColumns, ", ")).AddRow("role-1", "tenant-1", "operator", "Operator", "", "tenant", "active", 1, now, now, "user-1", "user-1"))
 	items, total, err := repository.SearchRoles(t.Context(), "tenant-1", "oper", "active", 20, 0)
 	if err != nil || total != 1 || len(items) != 1 {

@@ -142,15 +142,22 @@ func (s *Service) CreatePermission(ctx context.Context, tenantID, code, name, re
 }
 
 func (s *Service) ListPermissions(ctx context.Context, tenantID string, page, pageSize int) (Page[Permission], error) {
+	return s.SearchPermissions(ctx, tenantID, PermissionFilter{}, page, pageSize)
+}
+
+func (s *Service) SearchPermissions(ctx context.Context, tenantID string, filter PermissionFilter, page, pageSize int) (Page[Permission], error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Permission]{}, err
+	}
+	if err := normalizePermissionFilter(&filter); err != nil {
 		return Page[Permission]{}, err
 	}
 	page, pageSize, err := normalizePage(page, pageSize)
 	if err != nil {
 		return Page[Permission]{}, err
 	}
-	items, total, err := s.repository.ListPermissions(ctx, tenantID, pageSize, (page-1)*pageSize)
+	items, total, err := s.repository.SearchPermissions(ctx, tenantID, filter, pageSize, (page-1)*pageSize)
 	return Page[Permission]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
@@ -275,15 +282,22 @@ func (s *Service) GetRole(ctx context.Context, tenantID, id string) (Role, error
 }
 
 func (s *Service) ListRoles(ctx context.Context, tenantID string, page, pageSize int) (Page[Role], error) {
+	return s.SearchRolesFiltered(ctx, tenantID, RoleFilter{}, page, pageSize)
+}
+
+func (s *Service) SearchRolesFiltered(ctx context.Context, tenantID string, filter RoleFilter, page, pageSize int) (Page[Role], error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Role]{}, err
+	}
+	if err := normalizeRoleFilter(&filter); err != nil {
 		return Page[Role]{}, err
 	}
 	page, pageSize, err := normalizePage(page, pageSize)
 	if err != nil {
 		return Page[Role]{}, err
 	}
-	items, total, err := s.repository.ListRoles(ctx, tenantID, pageSize, (page-1)*pageSize)
+	items, total, err := s.repository.SearchRolesFiltered(ctx, tenantID, filter, pageSize, (page-1)*pageSize)
 	return Page[Role]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
@@ -499,15 +513,26 @@ func (s *Service) GetBinding(ctx context.Context, tenantID, id string) (Binding,
 }
 
 func (s *Service) ListBindings(ctx context.Context, tenantID, subjectID, subjectType string, page, pageSize int) (Page[Binding], error) {
+	return s.SearchBindings(ctx, tenantID, BindingFilter{SubjectID: subjectID, SubjectType: subjectType}, page, pageSize)
+}
+
+func (s *Service) SearchBindings(ctx context.Context, tenantID string, filter BindingFilter, page, pageSize int) (Page[Binding], error) {
 	tenantID = strings.TrimSpace(tenantID)
+	filter.SubjectID, filter.SubjectType = strings.TrimSpace(filter.SubjectID), strings.ToLower(strings.TrimSpace(filter.SubjectType))
+	if (filter.SubjectID == "") != (filter.SubjectType == "") || (filter.SubjectType != "" && !validSubjectType(filter.SubjectType)) {
+		return Page[Binding]{}, apperror.Invalid("subject_id and a valid subject_type must be provided together", nil)
+	}
 	if err := enforceInteractiveTenant(ctx, tenantID); err != nil {
+		return Page[Binding]{}, err
+	}
+	if err := normalizeBindingFilter(&filter); err != nil {
 		return Page[Binding]{}, err
 	}
 	page, pageSize, err := normalizePage(page, pageSize)
 	if err != nil {
 		return Page[Binding]{}, err
 	}
-	items, total, err := s.repository.ListBindings(ctx, tenantID, subjectID, subjectType, pageSize, (page-1)*pageSize)
+	items, total, err := s.repository.SearchBindings(ctx, tenantID, filter, pageSize, (page-1)*pageSize)
 	return Page[Binding]{Items: items, Total: total, Page: page, PageSize: pageSize}, translate(err)
 }
 
@@ -777,6 +802,102 @@ func normalizePage(page, pageSize int) (int, int, error) {
 		return 0, 0, apperror.Invalid("page_size must not exceed 100", nil)
 	}
 	return page, pageSize, nil
+}
+
+func normalizePermissionFilter(filter *PermissionFilter) error {
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
+	if len(filter.Keyword) > 100 {
+		return apperror.Invalid("permission keyword must not exceed 100 bytes", nil)
+	}
+	if err := normalizeFilterSets([]filterSet{{"permission_ids", &filter.IDs}, {"statuses", &filter.Statuses}, {"resource_types", &filter.ResourceTypes}, {"actions", &filter.Actions}}); err != nil {
+		return err
+	}
+	lowerValues(filter.Statuses)
+	lowerValues(filter.ResourceTypes)
+	lowerValues(filter.Actions)
+	for _, status := range filter.Statuses {
+		if status != "active" && status != "disabled" {
+			return apperror.Invalid("invalid permission status", nil)
+		}
+	}
+	return validateCreatedRange(filter.CreatedFrom, filter.CreatedTo)
+}
+
+func normalizeRoleFilter(filter *RoleFilter) error {
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
+	if len(filter.Keyword) > 100 {
+		return apperror.Invalid("role keyword must not exceed 100 bytes", nil)
+	}
+	if err := normalizeFilterSets([]filterSet{{"role_ids", &filter.IDs}, {"statuses", &filter.Statuses}, {"data_scopes", &filter.DataScopes}}); err != nil {
+		return err
+	}
+	lowerValues(filter.Statuses)
+	lowerValues(filter.DataScopes)
+	for _, status := range filter.Statuses {
+		if status != "active" && status != "disabled" {
+			return apperror.Invalid("invalid role status", nil)
+		}
+	}
+	for _, scope := range filter.DataScopes {
+		if !validDataScope(scope) {
+			return apperror.Invalid("invalid role data scope", nil)
+		}
+	}
+	return validateCreatedRange(filter.CreatedFrom, filter.CreatedTo)
+}
+
+func normalizeBindingFilter(filter *BindingFilter) error {
+	if err := normalizeFilterSets([]filterSet{{"binding_ids", &filter.IDs}, {"role_ids", &filter.RoleIDs}, {"statuses", &filter.Statuses}, {"organization_unit_ids", &filter.OrganizationUnitIDs}}); err != nil {
+		return err
+	}
+	lowerValues(filter.Statuses)
+	for _, status := range filter.Statuses {
+		if status != "active" && status != "revoked" {
+			return apperror.Invalid("invalid binding status", nil)
+		}
+	}
+	return validateCreatedRange(filter.CreatedFrom, filter.CreatedTo)
+}
+
+type filterSet struct {
+	name   string
+	values *[]string
+}
+
+func normalizeFilterSets(sets []filterSet) error {
+	for _, set := range sets {
+		name, values := set.name, set.values
+		if len(*values) > 100 {
+			return apperror.Invalid(name+" must not contain more than 100 values", nil)
+		}
+		seen := make(map[string]struct{}, len(*values))
+		normalized := make([]string, 0, len(*values))
+		for _, value := range *values {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				return apperror.Invalid(name+" must not contain empty values", nil)
+			}
+			if _, ok := seen[value]; !ok {
+				seen[value] = struct{}{}
+				normalized = append(normalized, value)
+			}
+		}
+		*values = normalized
+	}
+	return nil
+}
+
+func validateCreatedRange(from, to *time.Time) error {
+	if from != nil && to != nil && !from.Before(*to) {
+		return apperror.Invalid("created_from must be earlier than created_to", nil)
+	}
+	return nil
+}
+
+func lowerValues(values []string) {
+	for index := range values {
+		values[index] = strings.ToLower(values[index])
+	}
 }
 func validDataScope(value string) bool {
 	switch value {

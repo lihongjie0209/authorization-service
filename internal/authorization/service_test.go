@@ -38,6 +38,9 @@ type fakeRepository struct {
 	roleBatchTenant     string
 	roleBatchIDs        []string
 	binding             *Binding
+	permissionFilter    PermissionFilter
+	roleFilter          RoleFilter
+	bindingFilter       BindingFilter
 }
 
 type recordingOperationLog struct{ entry operationlog.Entry }
@@ -114,6 +117,10 @@ func (*fakeRepository) UpdatePermission(context.Context, sqlx.ExtContext, Permis
 func (*fakeRepository) ListPermissions(context.Context, string, int, int) ([]Permission, int64, error) {
 	return nil, 0, nil
 }
+func (f *fakeRepository) SearchPermissions(_ context.Context, tenantID string, filter PermissionFilter, _, _ int) ([]Permission, int64, error) {
+	f.permissionFilter = filter
+	return f.catalogItems, int64(len(f.catalogItems)), nil
+}
 func (f *fakeRepository) ListPermissionCatalog(_ context.Context, tenantID, search string, _, _ int) ([]Permission, int64, error) {
 	f.catalogTenant, f.catalogSearch = tenantID, search
 	return f.catalogItems, int64(len(f.catalogItems)), nil
@@ -135,6 +142,14 @@ func (f *fakeRepository) SearchRoles(_ context.Context, tenantID, keyword, statu
 		return nil, 0, nil
 	}
 	return []Role{*f.role}, 1, nil
+}
+func (f *fakeRepository) SearchRolesFiltered(_ context.Context, tenantID string, filter RoleFilter, limit, offset int) ([]Role, int64, error) {
+	f.roleFilter = filter
+	status := ""
+	if len(filter.Statuses) > 0 {
+		status = filter.Statuses[0]
+	}
+	return f.SearchRoles(context.Background(), tenantID, filter.Keyword, status, limit, offset)
 }
 func (f *fakeRepository) BatchGetRoles(_ context.Context, tenantID string, ids []string) ([]Role, error) {
 	f.roleBatchTenant, f.roleBatchIDs = tenantID, append([]string(nil), ids...)
@@ -176,6 +191,10 @@ func (f *fakeRepository) GetBinding(_ context.Context, tenantID, _ string) (Bind
 }
 func (*fakeRepository) UpdateBinding(context.Context, sqlx.ExtContext, Binding) error { return nil }
 func (*fakeRepository) ListBindings(context.Context, string, string, string, int, int) ([]Binding, int64, error) {
+	return nil, 0, nil
+}
+func (f *fakeRepository) SearchBindings(_ context.Context, _ string, filter BindingFilter, _, _ int) ([]Binding, int64, error) {
+	f.bindingFilter = filter
 	return nil, 0, nil
 }
 
@@ -222,6 +241,28 @@ func TestService_CheckDeniesWithoutGrant(t *testing.T) {
 	}
 	if decision.Allowed || decision.DataScope != "none" || decision.PolicyVersion != 7 || decision.DecisionID == "" {
 		t.Fatalf("decision = %+v", decision)
+	}
+}
+
+func TestListFiltersNormalizeAndRejectInvalidRanges(t *testing.T) {
+	repository := &fakeRepository{}
+	service := NewService(repository, &database.Transactor{})
+	ctx := principal.WithContext(t.Context(), principal.Principal{ID: "service-1", Type: principal.TypeServiceAccount})
+	from, to := time.Now().Add(-time.Hour), time.Now()
+	if _, err := service.SearchPermissions(ctx, "tenant-1", PermissionFilter{Keyword: " invoice ", IDs: []string{"p1", "p1"}, Statuses: []string{"active"}, CreatedFrom: &from, CreatedTo: &to}, 1, 20); err != nil {
+		t.Fatal(err)
+	}
+	if repository.permissionFilter.Keyword != "invoice" || len(repository.permissionFilter.IDs) != 1 {
+		t.Fatalf("permission filter = %+v", repository.permissionFilter)
+	}
+	if _, err := service.SearchRolesFiltered(ctx, "tenant-1", RoleFilter{Statuses: []string{"unknown"}}, 1, 20); err == nil {
+		t.Fatal("invalid role status must be rejected")
+	}
+	if _, err := service.SearchBindings(ctx, "tenant-1", BindingFilter{SubjectID: "membership-1"}, 1, 20); err == nil {
+		t.Fatal("subject id without subject type must be rejected")
+	}
+	if _, err := service.SearchPermissions(ctx, "tenant-1", PermissionFilter{CreatedFrom: &to, CreatedTo: &from}, 1, 20); err == nil {
+		t.Fatal("reversed creation range must be rejected")
 	}
 }
 

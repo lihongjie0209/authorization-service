@@ -1,0 +1,6 @@
+DROP INDEX idx_role_bindings_tenant_org_status ON role_bindings;
+DROP INDEX idx_role_bindings_tenant_role_status ON role_bindings;
+DROP INDEX idx_role_bindings_tenant_status_created ON role_bindings;
+DROP INDEX idx_roles_tenant_scope_status ON roles;
+DROP INDEX idx_roles_tenant_status_created ON roles;
+DROP INDEX idx_permissions_tenant_status_created ON permissions;

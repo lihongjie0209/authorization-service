@@ -438,10 +438,34 @@ definitions:
     type: object
   httptransport.ListBindingsRequest:
     properties:
+      binding_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      created_from:
+        type: string
+      created_to:
+        type: string
+      organization_unit_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       page:
         type: integer
       page_size:
         type: integer
+      role_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      statuses:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       subject_id:
         type: string
       subject_type:
@@ -453,6 +477,20 @@ definitions:
     type: object
   httptransport.ListMyBindingsRequest:
     properties:
+      binding_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      created_from:
+        type: string
+      created_to:
+        type: string
+      organization_unit_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       page:
         type: integer
       page_size:
@@ -462,6 +500,16 @@ definitions:
         - tenant
         - platform
         type: string
+      role_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      statuses:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       subject_id:
         type: string
       subject_type:
@@ -494,15 +542,42 @@ definitions:
     type: object
   httptransport.ListMyPermissionsRequest:
     properties:
+      actions:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      created_from:
+        type: string
+      created_to:
+        type: string
+      keyword:
+        maxLength: 100
+        type: string
       page:
         type: integer
       page_size:
         type: integer
+      permission_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       permission_scope:
         enum:
         - tenant
         - platform
         type: string
+      resource_types:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      statuses:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       tenant_id:
         type: string
     required:
@@ -527,6 +602,15 @@ definitions:
     type: object
   httptransport.ListMyRolesRequest:
     properties:
+      created_from:
+        type: string
+      created_to:
+        type: string
+      data_scopes:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       keyword:
         type: string
       page:
@@ -538,8 +622,18 @@ definitions:
         - tenant
         - platform
         type: string
+      role_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       status:
         type: string
+      statuses:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       tenant_id:
         type: string
     required:
@@ -548,10 +642,37 @@ definitions:
     type: object
   httptransport.ListPermissionsRequest:
     properties:
+      actions:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      created_from:
+        type: string
+      created_to:
+        type: string
+      keyword:
+        maxLength: 100
+        type: string
       page:
         type: integer
       page_size:
         type: integer
+      permission_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      resource_types:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      statuses:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       tenant_id:
         type: string
     required:
@@ -569,10 +690,32 @@ definitions:
     type: object
   httptransport.ListRolesRequest:
     properties:
+      created_from:
+        type: string
+      created_to:
+        type: string
+      data_scopes:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      keyword:
+        maxLength: 100
+        type: string
       page:
         type: integer
       page_size:
         type: integer
+      role_ids:
+        items:
+          type: string
+        maxItems: 100
+        type: array
+      statuses:
+        items:
+          type: string
+        maxItems: 100
+        type: array
       tenant_id:
         type: string
     required:

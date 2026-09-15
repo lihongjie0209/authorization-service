@@ -2,11 +2,15 @@ package grpctransport
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	authorizationdomain "github.com/lihongjie0209/authorization-service/internal/authorization"
 	authorizationv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/authorization/v1"
 	commonv1 "github.com/lihongjie0209/platform-protos/gen/go/platform/common/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -73,7 +77,15 @@ func (s *authorizationServer) UpdatePermission(ctx context.Context, request *aut
 }
 func (s *authorizationServer) ListPermissions(ctx context.Context, request *authorizationv1.ListPermissionsRequest) (*authorizationv1.ListPermissionsResponse, error) {
 	page, size := protoPage(request.GetPage())
-	values, err := s.service.ListPermissions(ctx, request.GetTenantId(), page, size)
+	createdFrom, err := optionalProtoTime(request.GetCreatedFrom())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	createdTo, err := optionalProtoTime(request.GetCreatedTo())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	values, err := s.service.SearchPermissions(ctx, request.GetTenantId(), authorizationdomain.PermissionFilter{Keyword: request.GetKeyword(), IDs: request.GetPermissionIds(), Statuses: request.GetStatuses(), ResourceTypes: request.GetResourceTypes(), Actions: request.GetActions(), CreatedFrom: createdFrom, CreatedTo: createdTo}, page, size)
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -106,7 +118,15 @@ func (s *authorizationServer) UpdateRole(ctx context.Context, request *authoriza
 }
 func (s *authorizationServer) ListRoles(ctx context.Context, request *authorizationv1.ListRolesRequest) (*authorizationv1.ListRolesResponse, error) {
 	page, size := protoPage(request.GetPage())
-	values, err := s.service.ListRoles(ctx, request.GetTenantId(), page, size)
+	createdFrom, err := optionalProtoTime(request.GetCreatedFrom())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	createdTo, err := optionalProtoTime(request.GetCreatedTo())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	values, err := s.service.SearchRolesFiltered(ctx, request.GetTenantId(), authorizationdomain.RoleFilter{Keyword: request.GetKeyword(), IDs: request.GetRoleIds(), Statuses: request.GetStatuses(), DataScopes: request.GetDataScopes(), CreatedFrom: createdFrom, CreatedTo: createdTo}, page, size)
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -168,7 +188,15 @@ func (s *authorizationServer) ListBindings(ctx context.Context, request *authori
 	if request.GetSubject() != nil {
 		subjectID, subjectType = request.GetSubject().GetId(), subjectTypeString(request.GetSubject().GetType())
 	}
-	values, err := s.service.ListBindings(ctx, request.GetTenantId(), subjectID, subjectType, page, size)
+	createdFrom, err := optionalProtoTime(request.GetCreatedFrom())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	createdTo, err := optionalProtoTime(request.GetCreatedTo())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	values, err := s.service.SearchBindings(ctx, request.GetTenantId(), authorizationdomain.BindingFilter{SubjectID: subjectID, SubjectType: subjectType, IDs: request.GetBindingIds(), RoleIDs: request.GetRoleIds(), Statuses: request.GetStatuses(), OrganizationUnitIDs: request.GetOrganizationUnitIds(), CreatedFrom: createdFrom, CreatedTo: createdTo}, page, size)
 	if err != nil {
 		return nil, grpcError(err)
 	}
@@ -202,6 +230,16 @@ func protoPage(value *commonv1.PageRequest) (int, int) {
 }
 func pageResult(total int64, page, size int) *commonv1.PageResult {
 	return &commonv1.PageResult{Total: uint64(total), Page: uint32(page), PageSize: uint32(size)}
+}
+func optionalProtoTime(value *timestamppb.Timestamp) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+	if err := value.CheckValid(); err != nil {
+		return nil, fmt.Errorf("invalid timestamp: %w", err)
+	}
+	result := value.AsTime()
+	return &result, nil
 }
 func subjectTypeString(value authorizationv1.SubjectType) string {
 	return strings.ToLower(strings.TrimPrefix(value.String(), "SUBJECT_TYPE_"))

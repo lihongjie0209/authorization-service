@@ -2,9 +2,11 @@ package httptransport
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lihongjie0209/authorization-service/internal/apperror"
+	"github.com/lihongjie0209/authorization-service/internal/authorization"
 	"github.com/lihongjie0209/microservice-platform-go/principal"
 )
 
@@ -16,10 +18,30 @@ type CreatePermissionRequest struct {
 	Action              string `json:"action" binding:"required"`
 	ConditionExpression string `json:"condition_expression"`
 }
+
+func permissionFilter(keyword string, ids, statuses, resourceTypes, actions []string, from, to *time.Time) authorization.PermissionFilter {
+	return authorization.PermissionFilter{Keyword: keyword, IDs: ids, Statuses: statuses, ResourceTypes: resourceTypes, Actions: actions, CreatedFrom: from, CreatedTo: to}
+}
+
+func roleFilter(keyword string, ids, statuses, dataScopes []string, from, to *time.Time) authorization.RoleFilter {
+	return authorization.RoleFilter{Keyword: keyword, IDs: ids, Statuses: statuses, DataScopes: dataScopes, CreatedFrom: from, CreatedTo: to}
+}
+
+func bindingFilter(subjectID, subjectType string, ids, roleIDs, statuses, organizationUnitIDs []string, from, to *time.Time) authorization.BindingFilter {
+	return authorization.BindingFilter{SubjectID: subjectID, SubjectType: subjectType, IDs: ids, RoleIDs: roleIDs, Statuses: statuses, OrganizationUnitIDs: organizationUnitIDs, CreatedFrom: from, CreatedTo: to}
+}
+
 type ListPermissionsRequest struct {
-	TenantID string `json:"tenant_id" binding:"required"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"page_size"`
+	TenantID      string     `json:"tenant_id" binding:"required"`
+	Keyword       string     `json:"keyword" binding:"max=100"`
+	PermissionIDs []string   `json:"permission_ids" binding:"max=100"`
+	Statuses      []string   `json:"statuses" binding:"max=100"`
+	ResourceTypes []string   `json:"resource_types" binding:"max=100"`
+	Actions       []string   `json:"actions" binding:"max=100"`
+	CreatedFrom   *time.Time `json:"created_from"`
+	CreatedTo     *time.Time `json:"created_to"`
+	Page          int        `json:"page"`
+	PageSize      int        `json:"page_size"`
 }
 type ListMyPermissionCatalogRequest struct {
 	TenantID        string `json:"tenant_id" binding:"required"`
@@ -47,10 +69,17 @@ type UpdateMyPermissionRequest struct {
 	Version             int64  `json:"version" binding:"required,gt=0"`
 }
 type ListMyPermissionsRequest struct {
-	TenantID        string `json:"tenant_id" binding:"required"`
-	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
-	Page            int    `json:"page"`
-	PageSize        int    `json:"page_size"`
+	TenantID        string     `json:"tenant_id" binding:"required"`
+	PermissionScope string     `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Page            int        `json:"page"`
+	PageSize        int        `json:"page_size"`
+	Keyword         string     `json:"keyword" binding:"max=100"`
+	PermissionIDs   []string   `json:"permission_ids" binding:"max=100"`
+	Statuses        []string   `json:"statuses" binding:"max=100"`
+	ResourceTypes   []string   `json:"resource_types" binding:"max=100"`
+	Actions         []string   `json:"actions" binding:"max=100"`
+	CreatedFrom     *time.Time `json:"created_from"`
+	CreatedTo       *time.Time `json:"created_to"`
 }
 type UpdatePermissionRequest struct {
 	TenantID            string `json:"tenant_id" binding:"required"`
@@ -95,9 +124,15 @@ type GetMyRoleRequest struct {
 	RoleID          string `json:"role_id" binding:"required"`
 }
 type ListRolesRequest struct {
-	TenantID string `json:"tenant_id" binding:"required"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"page_size"`
+	TenantID    string     `json:"tenant_id" binding:"required"`
+	Page        int        `json:"page"`
+	PageSize    int        `json:"page_size"`
+	Keyword     string     `json:"keyword" binding:"max=100"`
+	RoleIDs     []string   `json:"role_ids" binding:"max=100"`
+	Statuses    []string   `json:"statuses" binding:"max=100"`
+	DataScopes  []string   `json:"data_scopes" binding:"max=100"`
+	CreatedFrom *time.Time `json:"created_from"`
+	CreatedTo   *time.Time `json:"created_to"`
 }
 type CreateMyRoleRequest struct {
 	TenantID        string `json:"tenant_id" binding:"required"`
@@ -118,12 +153,17 @@ type UpdateMyRoleRequest struct {
 	Version         int64  `json:"version" binding:"required,gt=0"`
 }
 type ListMyRolesRequest struct {
-	TenantID        string `json:"tenant_id" binding:"required"`
-	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
-	Keyword         string `json:"keyword"`
-	Status          string `json:"status"`
-	Page            int    `json:"page"`
-	PageSize        int    `json:"page_size"`
+	TenantID        string     `json:"tenant_id" binding:"required"`
+	PermissionScope string     `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	Keyword         string     `json:"keyword"`
+	Status          string     `json:"status"`
+	Page            int        `json:"page"`
+	PageSize        int        `json:"page_size"`
+	RoleIDs         []string   `json:"role_ids" binding:"max=100"`
+	Statuses        []string   `json:"statuses" binding:"max=100"`
+	DataScopes      []string   `json:"data_scopes" binding:"max=100"`
+	CreatedFrom     *time.Time `json:"created_from"`
+	CreatedTo       *time.Time `json:"created_to"`
 }
 type BatchGetMyRolesRequest struct {
 	TenantID        string   `json:"tenant_id" binding:"required"`
@@ -189,11 +229,17 @@ type GetMyBindingRequest struct {
 	BindingID       string `json:"binding_id" binding:"required"`
 }
 type ListBindingsRequest struct {
-	TenantID    string `json:"tenant_id" binding:"required"`
-	SubjectID   string `json:"subject_id"`
-	SubjectType string `json:"subject_type"`
-	Page        int    `json:"page"`
-	PageSize    int    `json:"page_size"`
+	TenantID            string     `json:"tenant_id" binding:"required"`
+	SubjectID           string     `json:"subject_id"`
+	SubjectType         string     `json:"subject_type"`
+	Page                int        `json:"page"`
+	PageSize            int        `json:"page_size"`
+	BindingIDs          []string   `json:"binding_ids" binding:"max=100"`
+	RoleIDs             []string   `json:"role_ids" binding:"max=100"`
+	Statuses            []string   `json:"statuses" binding:"max=100"`
+	OrganizationUnitIDs []string   `json:"organization_unit_ids" binding:"max=100"`
+	CreatedFrom         *time.Time `json:"created_from"`
+	CreatedTo           *time.Time `json:"created_to"`
 }
 type CreateMyBindingRequest struct {
 	TenantID           string `json:"tenant_id" binding:"required"`
@@ -210,12 +256,18 @@ type RevokeMyBindingRequest struct {
 	Version         int64  `json:"version" binding:"required,gt=0"`
 }
 type ListMyBindingsRequest struct {
-	TenantID        string `json:"tenant_id" binding:"required"`
-	PermissionScope string `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
-	SubjectID       string `json:"subject_id"`
-	SubjectType     string `json:"subject_type"`
-	Page            int    `json:"page"`
-	PageSize        int    `json:"page_size"`
+	TenantID            string     `json:"tenant_id" binding:"required"`
+	PermissionScope     string     `json:"permission_scope" binding:"required,oneof=tenant platform" enums:"tenant,platform"`
+	SubjectID           string     `json:"subject_id"`
+	SubjectType         string     `json:"subject_type"`
+	Page                int        `json:"page"`
+	PageSize            int        `json:"page_size"`
+	BindingIDs          []string   `json:"binding_ids" binding:"max=100"`
+	RoleIDs             []string   `json:"role_ids" binding:"max=100"`
+	Statuses            []string   `json:"statuses" binding:"max=100"`
+	OrganizationUnitIDs []string   `json:"organization_unit_ids" binding:"max=100"`
+	CreatedFrom         *time.Time `json:"created_from"`
+	CreatedTo           *time.Time `json:"created_to"`
 }
 type CheckAuthorizationRequest struct {
 	TenantID     string            `json:"tenant_id" binding:"required"`
@@ -319,7 +371,7 @@ func (h *Handler) ListPermissions(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.ListPermissions(c.Request.Context(), request.TenantID, request.Page, request.PageSize)
+	value, err := h.authorization.SearchPermissions(c.Request.Context(), request.TenantID, permissionFilter(request.Keyword, request.PermissionIDs, request.Statuses, request.ResourceTypes, request.Actions, request.CreatedFrom, request.CreatedTo), request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -478,7 +530,7 @@ func (h *Handler) ListMyPermissions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	value, err := h.authorization.ListPermissions(c.Request.Context(), tenantID, request.Page, request.PageSize)
+	value, err := h.authorization.SearchPermissions(c.Request.Context(), tenantID, permissionFilter(request.Keyword, request.PermissionIDs, request.Statuses, request.ResourceTypes, request.Actions, request.CreatedFrom, request.CreatedTo), request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -570,7 +622,7 @@ func (h *Handler) ListRoles(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.ListRoles(c.Request.Context(), request.TenantID, request.Page, request.PageSize)
+	value, err := h.authorization.SearchRolesFiltered(c.Request.Context(), request.TenantID, roleFilter(request.Keyword, request.RoleIDs, request.Statuses, request.DataScopes, request.CreatedFrom, request.CreatedTo), request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -686,7 +738,11 @@ func (h *Handler) ListMyRoles(c *gin.Context) {
 	if !ok {
 		return
 	}
-	value, err := h.authorization.SearchRoles(c.Request.Context(), tenantID, request.Keyword, request.Status, request.Page, request.PageSize)
+	statuses := request.Statuses
+	if request.Status != "" {
+		statuses = append(statuses, request.Status)
+	}
+	value, err := h.authorization.SearchRolesFiltered(c.Request.Context(), tenantID, roleFilter(request.Keyword, request.RoleIDs, statuses, request.DataScopes, request.CreatedFrom, request.CreatedTo), request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -1015,7 +1071,7 @@ func (h *Handler) ListBindings(c *gin.Context) {
 		Fail(c, h.logger, apperror.Invalid("invalid json request", err))
 		return
 	}
-	value, err := h.authorization.ListBindings(c.Request.Context(), request.TenantID, request.SubjectID, request.SubjectType, request.Page, request.PageSize)
+	value, err := h.authorization.SearchBindings(c.Request.Context(), request.TenantID, bindingFilter(request.SubjectID, request.SubjectType, request.BindingIDs, request.RoleIDs, request.Statuses, request.OrganizationUnitIDs, request.CreatedFrom, request.CreatedTo), request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
@@ -1105,7 +1161,7 @@ func (h *Handler) ListMyBindings(c *gin.Context) {
 	if !ok {
 		return
 	}
-	value, err := h.authorization.ListBindings(c.Request.Context(), tenantID, request.SubjectID, request.SubjectType, request.Page, request.PageSize)
+	value, err := h.authorization.SearchBindings(c.Request.Context(), tenantID, bindingFilter(request.SubjectID, request.SubjectType, request.BindingIDs, request.RoleIDs, request.Statuses, request.OrganizationUnitIDs, request.CreatedFrom, request.CreatedTo), request.Page, request.PageSize)
 	if err != nil {
 		Fail(c, h.logger, err)
 		return
