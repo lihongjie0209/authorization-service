@@ -150,7 +150,10 @@ func startDatabase(t *testing.T, ctx context.Context, databaseType string) (stri
 			t.Fatal(err)
 		}
 		testcontainers.CleanupContainer(t, container)
-		dsn, err := container.ConnectionString(ctx, "parseTime=true")
+		// Match the runtime database.Open configuration. MySQL DATETIME values do
+		// not carry timezone information, so the driver location must be explicit
+		// for audit timestamps and time-range filters to use the same wall clock.
+		dsn, err := container.ConnectionString(ctx, "parseTime=true&loc=Asia%2FShanghai")
 		if err != nil {
 			t.Fatal(err)
 		}
